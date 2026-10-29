@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planning du Cabinet - Gestion Kinés</title>
+    <style>
+        :root {
+            --bg-app: #1a202c;        
+            --bg-panel: #2d3748;      
+            --text-app: #f7fafc;      
+            --text-muted-app: #a0aec0;
+
+            --bg-calendar: #ffffff;   
+            --bg-main-cal: #f8fafc;   
+            --border-color: #e2e8f0;
+            --text-main-cal: #2d3748;
+            --text-muted-cal: #718096;
+            
+            --primary-color: #3182ce;
+            --primary-hover: #2b6cb0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-app); color: var(--text-app);
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- BARRE D'OUTILS --- */
+        .toolbar {
+            background-color: var(--bg-panel); padding: 12px 20px; 
+            display: flex; justify-content: space-between; align-items: center; z-index: 10; flex-shrink: 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .brand h1 { font-size: 1.25rem; color: #63b3ed; margin-bottom: 0;}
+        .controls { display: flex; gap: 12px; align-items: center; }
+        .control-group { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+        
+        label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted-app); text-transform: uppercase; }
+        
+        /* Ajout de textarea dans les styles généraux des inputs */
+        select, input[type="date"], input[type="password"], input[type="number"], input[type="text"], input[type="time"], input[type="color"], textarea {
+            width: 100%; padding: 8px 12px; border: 1px solid #4a5568; background-color: #1a202c; color: white;
+            border-radius: 6px; font-size: 0.9rem; outline: none; font-family: inherit;
+        }
+        select, input { height: 35px; }
+        textarea { resize: vertical; min-height: 60px; }
+        select:focus, input:focus, textarea:focus { border-color: var(--primary-color); }
+        input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+        
+        .btn-save {
+            padding: 8px 16px; background-color: var(--primary-color); color: white; 
+            border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; height: 35px;
+        }
+        .btn-save:hover { background-color: var(--primary-hover); }
+        .btn-cancel {
+            padding: 8px 16px; background-color: transparent; color: white;
+            border: 1px solid #4a5568; border-radius: 6px; cursor: pointer; height: 35px;
+        }
+        .btn-cancel:hover { background-color: #4a5568; }
+
+        /* --- CALENDRIER --- */
+        .calendar-wrapper { flex-grow: 1; padding: 15px; display: flex; flex-direction: column; overflow: hidden; }
+        .calendar-container {
+            flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; 
+            background: var(--bg-calendar); color: var(--text-main-cal); position: relative;
+            border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .calendar-grid { display: grid; grid-template-columns: 60px 1fr; min-width: 800px; }
+        .time-axis { border-right: 1px solid var(--border-color); background-color: var(--bg-main-cal); position: sticky; left: 0; z-index: 3; }
+        .time-header { height: 45px; border-bottom: 1px solid var(--border-color); background: var(--bg-main-cal); }
+        .calendar-grid.global-view .time-header { height: 75px; }
+
+        .time-slot-hour { border-bottom: 1px solid var(--border-color); position: relative; }
+        .time-slot-hour span {
+            position: absolute; top: 2px; right: 5px; font-size: 0.75rem; 
+            color: var(--text-muted-cal); font-weight: bold; padding: 0 4px;
+        }
+
+        .days-wrapper { display: grid; grid-template-columns: repeat(5, 1fr); width: 100%; }
+        .day-column { border-right: 1px solid var(--border-color); display: flex; flex-direction: column; min-width: 0; }
+        .day-header {
+            height: 45px; background: var(--bg-main-cal); border-bottom: 1px solid var(--border-color);
+            display: flex; flex-direction: column; justify-content: center; align-items: center; position: sticky; top: 0; z-index: 2;
+        }
+        .calendar-grid:not(.global-view) .day-header { height: 75px; } 
+        .day-name { font-weight: 600; font-size: 0.9rem; }
+        
+        .practitioners-subgrid { display: grid; height: 100%; }
+        .day-column.single-practitioner .practitioners-subgrid { grid-template-columns: 1fr; }
+        .practitioner-column { border-right: 1px solid #edf2f7; position: relative; cursor: pointer; }
+        .practitioner-column:hover { background-color: rgba(0,0,0,0.01); }
+        .practitioner-column:last-child { border-right: none; }
+
+        .unavailable-block {
+            position: absolute; left: 0; right: 0; pointer-events: none; background-color: rgba(0, 0, 0, 0.04);
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.03) 10px, rgba(0,0,0,0.03) 20px);
+            z-index: 0; border-bottom: 1px solid var(--border-color);
+        }
+        
+        .user-blocked-slot {
+            pointer-events: auto !important; z-index: 1 !important; cursor: pointer;
+            border-left: 4px solid #a0aec0; border-radius: 4px; left: 2px; right: 2px;
+        }
+        .user-blocked-slot:hover { background-color: rgba(229, 62, 62, 0.1); }
+
+        /* --- CORRECTION DU BUG D'AFFICHAGE DES BULLES D'INFO --- */
+        .appointment {
+            position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 4px 6px; font-size: 0.8rem;
+            /* Le texte est masqué s'il dépasse... */
+            overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+            border-left: 4px solid; cursor: pointer; z-index: 2; transition: transform 0.1s;
+        }
+        /* ... Mais au survol, on libère l'espace et on passe la case au premier plan ! */
+        .appointment:hover { 
+            transform: scale(1.01); 
+            z-index: 50; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15); 
+            overflow: visible; 
+        }
+        /* Modifs des RDV pour laisser sortir la bulle d'info */
+        .appointment {
+            position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 4px 6px; font-size: 0.8rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid; cursor: pointer; z-index: 2; transition: transform 0.1s;
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+        .appointment:hover { transform: scale(1.01); z-index: 50; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
+        
+        /* --- NOUVEAU : Styles pour le nom en gras et l'horaire affiné --- */
+        .appointment .appt-patient-name { font-weight: 700; display: block; font-size: 0.8rem; margin-bottom: 2px; }
+        .appointment .appt-time-details { display: block; font-size: 0.7rem; opacity: 0.85; }
+
+        .appt-text-content {
+            overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;
+        }
+
+        /* Ajustement de la bulle d'info (Notes) */
+        .note-wrapper {
+            position: absolute; top: 4px; right: 4px; display: inline-block;
+        }
+        .note-icon {
+            font-size: 0.85rem; cursor: help;
+        }
+        .note-tooltip {
+            visibility: hidden; background-color: var(--bg-panel); color: var(--text-app);
+            text-align: left; border-radius: 6px; padding: 8px 10px; position: absolute;
+            z-index: 100; /* Assure que la note passe au-dessus de tout */
+            top: 20px; /* Descend un peu la bulle pour ne pas cacher l'icône */
+            right: 0; min-width: 200px; max-width: 300px;
+            white-space: pre-wrap; box-shadow: 0 4px 12px rgba(0,0,0,0.6); 
+            opacity: 0; transition: opacity 0.2s; border: 1px solid #4a5568; 
+            font-weight: normal; pointer-events: none;
+        }
+        .note-wrapper:hover .note-tooltip { visibility: visible; opacity: 1; }
+
+        .sub-header-labels {
+            display: grid; width: 100%; background: #edf2f7; font-size: 0.7rem; text-align: center; font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sub-header-labels > div { padding: 4px 0; border-right: 1px solid var(--border-color); position: relative; }
+        .sub-header-labels > div:last-child { border-right: none; }
+
+        .btn-day-config {
+            background: none; border: none; cursor: pointer; font-size: 0.8rem; margin-left: 5px;
+            opacity: 0.3; transition: opacity 0.2s;
+        }
+        .sub-header-labels > div:hover .btn-day-config, .day-header:hover .btn-day-config { opacity: 1; }
+
+        .nav-name-link { transition: opacity 0.2s; }
+        .nav-name-link:hover { opacity: 0.7; }
+
+        /* --- MODALES --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); 
+            backdrop-filter: blur(2px); display: none; justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal-content { background: var(--bg-panel); color: var(--text-app); padding: 20px; border-radius: 10px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); }
+        .modal-content h3 { margin-bottom: 15px; color: #63b3ed; font-size: 1.1rem;}
+        .modal-body { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+        @media (max-width: 768px) {
+            body { overflow: auto; }
+            .toolbar { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px; }
+            .controls { grid-template-columns: 1fr 1fr; display: grid; }
+            .calendar-wrapper { padding: 5px; } 
+            .calendar-container { overflow-x: hidden; border-radius: 5px; }
+            .calendar-grid { min-width: 100%; grid-template-columns: 50px 1fr; }
+            .days-wrapper { grid-template-columns: 1fr; }
+            #practitionerFilter option[value="all"] { display: none; }
+            .sub-header-labels { display: none; }
+            .practitioners-subgrid { grid-template-columns: 1fr !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MODALE : AJOUT / MODIFICATION RDV -->
+    <div class="modal-overlay" id="addApptModal">
+        <div class="modal-content" style="width: 320px;">
+            <h3 id="modalTitle">Nouveau Rendez-vous</h3>
+            <div class="modal-body">
+                <div class="control-group">
+                    <label>Patient / Motif</label>
+                    <input type="text" id="newPatientName" list="patientsList" placeholder="Ex: Jean Dupont" autocomplete="off">
+                    <datalist id="patientsList"></datalist>
+                </div>
+                
+                <!-- NOUVEAU : Grille d'options de suivi -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: -5px; margin-bottom: 5px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="newApptFirstVisit" style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="newApptFirstVisit" style="margin: 0; cursor: pointer; color: #63b3ed; text-transform: none;">1er RDV</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="newApptLastVisit" style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="newApptLastVisit" style="margin: 0; cursor: pointer; color: #fc8181; text-transform: none;">Dernier RDV</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; grid-column: span 2;">
+                        <label for="newApptRemaining" style="margin: 0; text-transform: none; color: #a0aec0;">Séances restantes :</label>
+                        <input type="number" id="newApptRemaining" style="width: 70px; height: 30px; padding: 2px 8px;" min="0" placeholder="Ex: 5">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Téléphone(s)</label>
+                    <div id="phoneInputsContainer" style="display: flex; flex-direction: column; gap: 5px;">
+                        <div style="display: flex; gap: 5px;">
+                            <input type="tel" class="appt-phone-input" placeholder="06 00 00 00 00">
+                            <button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()" title="Ajouter un numéro">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Durée (min)</label>
+                    <input type="number" id="newApptDuration" step="10">
+                </div>
+                <div class="control-group">
+                    <label>Notes</label>
+                    <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..."></textarea>
+                </div>
+                <input type="hidden" id="editApptId">
+                <input type="hidden" id="newApptKine"><input type="hidden" id="newApptDay"><input type="hidden" id="newApptTime">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" id="cancelApptBtn">Annuler</button>
+                <button class="btn-cancel" id="deleteApptBtn" style="border-color: #e53e3e; color: #e53e3e; display: none;" title="Supprimer ce rendez-vous">Supprimer</button>
+                <button class="btn-cancel" id="blockSlotBtn" style="border-color: #e53e3e; color: #e53e3e;" title="Rendre indisponible">Bloquer</button>
+                <button class="btn-save" id="confirmApptBtn">Ajouter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE : GESTION DES KINÉS -->
+    <div class="modal-overlay" id="adminModal">
+        <div class="modal-content" style="width: 380px;">
+            <h3>⚙️ Config globale Praticiens</h3>
+            <div class="modal-body">
+                <div class="control-group"><label>Praticien</label><select id="adminKineSelect"></select></div>
+                <div class="control-group"><label>Nom</label><input type="text" id="adminName"></div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group"><label>Arrivée</label><input type="time" id="adminStart"></div>
+                    <div class="control-group"><label>Départ</label><input type="time" id="adminEnd"></div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Créneau</label>
+                        <select id="adminSlot"><option value="20">20 min</option><option value="30">30 min</option></select>
+                    </div>
+                    <div class="control-group"><label>Couleur</label><input type="color" id="adminColor" style="padding: 2px;"></div>
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: space-between;">
+                <button class="btn-cancel" id="addKineBtn" style="border-color: #319795; color: #319795;">+ Nouveau</button>
+                <div>
+                    <button class="btn-cancel" id="closeAdminBtn">Fermer</button>
+                    <button class="btn-save" id="saveKineBtn">Appliquer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE : HORAIRES DU JOUR SPÉCIFIQUE -->
+    <div class="modal-overlay" id="dayConfigModal">
+        <div class="modal-content" style="width: 350px;">
+            <h3 id="dayModalTitle">Horaires du Jour</h3>
+            <div class="modal-body">
+                <input type="hidden" id="dayModalKine"><input type="hidden" id="dayModalDay">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group"><label>Arrivée</label><input type="time" id="dayStart"></div>
+                    <div class="control-group"><label>Départ</label><input type="time" id="dayEnd"></div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group"><label>Début Pause</label><input type="time" id="dayPauseStart"></div>
+                    <div class="control-group"><label>Fin Pause</label><input type="time" id="dayPauseEnd"></div>
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: space-between;">
+                <button class="btn-cancel" id="resetDayBtn" style="border-color: #e53e3e; color: #e53e3e;" title="Remettre les horaires par défaut">Réinitialiser</button>
+                <div>
+                    <button class="btn-cancel" onclick="document.getElementById('dayConfigModal').style.display='none'">Fermer</button>
+                    <button class="btn-save" id="saveDayBtn">Valider</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BARRE D'OUTILS -->
+    <header class="toolbar">
+        <div class="brand"><h1>Planning du Cabinet</h1></div>
+        <div class="controls">
+            <div class="control-group" style="width: auto;">
+                <label>Date</label>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn-cancel" id="prevDateBtn" style="padding: 0 10px;">&lt;</button>
+                    <input type="date" id="dateSelect">
+                    <button class="btn-cancel" id="nextDateBtn" style="padding: 0 10px;">&gt;</button>
+                </div>
+            </div>
+            <div class="control-group" style="width: auto; min-width: 150px;"><label>Vue</label><select id="practitionerFilter"></select></div>
+            <button class="btn-save" id="openAdminBtn" style="margin-top: 18px; background-color: #4a5568;">⚙️ Config</button>
+        </div>
+    </header>
+
+    <!-- CALENDRIER -->
+    <div class="calendar-wrapper">
+        <div class="calendar-container">
+            <div class="calendar-grid" id="mainCalendarGrid">
+                <div class="time-axis" id="timeAxis"></div>
+                <div class="days-wrapper" id="daysWrapper"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const START_HOUR = 7, END_HOUR = 20, PIXELS_PER_MINUTE = 2;
+        const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE; 
+        const DAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
+
+        let kinesConfig = JSON.parse(localStorage.getItem('kinesConfig')) || {
+            'k1': { name: 'Kiné A', slotDuration: 30, color: '#319795', start: 8.0, end: 18.5, pauseStart: 12.0, pauseEnd: 13.5, schedule: {} }, 
+            'k2': { name: 'Kiné B', slotDuration: 20, color: '#805ad5', start: 7.0, end: 16.0, pauseStart: 12.0, pauseEnd: 12.5, schedule: {} }
+        };
+        let mockAppointments = JSON.parse(localStorage.getItem('mockAppointments')) || [
+            // J'ai ajouté une note factice dans le mock de base pour que tu voies le rendu immédiatement
+            { id: 1, kineId: 'k1', dayIndex: 0, timeStr: '08:30', duration: 30, patient: 'Mme Martin', type: 'rdv', note: 'Première séance post-opératoire.\nNe pas oublier le dossier.' }
+        ];
+
+        function saveData() {
+            localStorage.setItem('kinesConfig', JSON.stringify(kinesConfig));
+            localStorage.setItem('mockAppointments', JSON.stringify(mockAppointments));
+        }
+
+        // --- UTILITAIRES ---
+        function timeToFloat(timeStr) {
+            if (!timeStr) return 0;
+            const [h, m] = timeStr.split(':').map(Number);
+            return h + (m / 60);
+        }
+
+        function floatToTime(f) {
+            if (isNaN(f)) return "00:00";
+            const h = Math.floor(f);
+            const m = Math.round((f - h) * 60);
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        }
+
+        function hexToRgba(hex, alpha) {
+            let r = 0, g = 0, b = 0;
+            if (hex.length === 7) { r = parseInt(hex.slice(1, 3), 16); g = parseInt(hex.slice(3, 5), 16); b = parseInt(hex.slice(5, 7), 16); }
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function getDailySchedule(kineId, dayIndex) {
+            const config = kinesConfig[kineId];
+            if (config.schedule && config.schedule[dayIndex]) return config.schedule[dayIndex];
+            return { start: config.start, end: config.end, pauseStart: config.pauseStart, pauseEnd: config.pauseEnd };
+        }
+
+        function getTopPosition(timeStr) {
+            const [h, m] = timeStr.split(':').map(Number);
+            return (((h - START_HOUR) * 60) + m) * PIXELS_PER_MINUTE;
+        }
+
+        // --- DOM ELEMENTS ---
+        const timeAxis = document.getElementById('timeAxis'), daysWrapper = document.getElementById('daysWrapper');
+        const practitionerFilter = document.getElementById('practitionerFilter'), dateSelect = document.getElementById('dateSelect');
+        const calendarGrid = document.getElementById('mainCalendarGrid');
+        
+        const adminModal = document.getElementById('adminModal'), adminKineSelect = document.getElementById('adminKineSelect');
+        const dayConfigModal = document.getElementById('dayConfigModal');
+
+        // --- AUTO-COMPLÉTION PATIENTS ---
+        function updatePatientSuggestions() {
+            const datalist = document.getElementById('patientsList');
+            datalist.innerHTML = ''; // On vide la liste actuelle
+            
+            // On récupère tous les noms, on enlève les vides, et on utilise un Set pour éviter les doublons
+            const allNames = mockAppointments.map(appt => appt.patient).filter(name => name && name !== 'Indisponible' && name !== 'Patient');
+            const uniqueNames = [...new Set(allNames)].sort();
+            
+            // On crée une <option> pour chaque patient unique
+            uniqueNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                datalist.appendChild(option);
+            });
+        }
+
+        // --- INITIALISATION ---
+        function init() {
+            if(!dateSelect.value) dateSelect.value = new Date().toISOString().split('T')[0];
+            updateKineSelects(); 
+            updatePatientSuggestions();
+            if (window.innerWidth <= 768 && practitionerFilter.value === 'all') practitionerFilter.value = Object.keys(kinesConfig)[0];
+            
+            renderCalendar();
+
+            practitionerFilter.addEventListener('change', renderCalendar);
+            dateSelect.addEventListener('change', renderCalendar);
+            adminKineSelect.addEventListener('change', (e) => loadAdminForm(e.target.value));
+            
+            document.getElementById('openAdminBtn').addEventListener('click', () => { loadAdminForm(adminKineSelect.value || Object.keys(kinesConfig)[0]); adminModal.style.display = 'flex'; });
+            document.getElementById('closeAdminBtn').addEventListener('click', () => adminModal.style.display = 'none');
+            document.getElementById('saveKineBtn').addEventListener('click', saveKineConfiguration);
+            document.getElementById('addKineBtn').addEventListener('click', createNewKine);
+
+            document.getElementById('cancelApptBtn').addEventListener('click', () => document.getElementById('addApptModal').style.display = 'none');
+            document.getElementById('confirmApptBtn').addEventListener('click', saveNewAppointment);
+            document.getElementById('deleteApptBtn').addEventListener('click', deleteAppointment);
+            document.getElementById('blockSlotBtn').addEventListener('click', saveUnavailableSlot);
+
+            document.getElementById('saveDayBtn').addEventListener('click', saveDayConfiguration);
+            document.getElementById('resetDayBtn').addEventListener('click', resetDayConfiguration);
+
+            document.getElementById('prevDateBtn').addEventListener('click', () => shiftDate(window.innerWidth <= 768 ? -1 : -7));
+            document.getElementById('nextDateBtn').addEventListener('click', () => shiftDate(window.innerWidth <= 768 ? 1 : 7));
+
+            window.addEventListener('resize', () => {
+                if (window.innerWidth <= 768 && practitionerFilter.value === 'all') practitionerFilter.value = Object.keys(kinesConfig)[0];
+                renderCalendar();
+            });
+        }
+
+        // --- NAVIGATION VUES ---
+        window.switchToSingleView = function(kineId) {
+            practitionerFilter.value = kineId;
+            renderCalendar();
+        };
+
+        window.switchToGlobalView = function() {
+            practitionerFilter.value = 'all';
+            renderCalendar();
+        };
+
+        function shiftDate(days) {
+            const d = new Date(dateSelect.value); d.setDate(d.getDate() + days);
+            dateSelect.value = d.toISOString().split('T')[0]; renderCalendar();
+        }
+
+        function updateKineSelects() {
+            let filterHtml = '<option value="all">Tous les kinés (Globale)</option>', adminHtml = '';
+            for (const [key, kine] of Object.entries(kinesConfig)) {
+                filterHtml += `<option value="${key}">${kine.name}</option>`;
+                adminHtml += `<option value="${key}">${kine.name}</option>`;
+            }
+            practitionerFilter.innerHTML = filterHtml; adminKineSelect.innerHTML = adminHtml;
+        }
+
+        // --- GESTION ADMIN GLOBALE ---
+        function loadAdminForm(kineId) {
+            if(!kinesConfig[kineId]) return;
+            const config = kinesConfig[kineId];
+            document.getElementById('adminName').value = config.name;
+            document.getElementById('adminSlot').value = config.slotDuration;
+            document.getElementById('adminStart').value = floatToTime(config.start);
+            document.getElementById('adminEnd').value = floatToTime(config.end);
+            document.getElementById('adminColor').value = config.color;
+        }
+
+        function saveKineConfiguration() {
+            const kId = adminKineSelect.value, config = kinesConfig[kId];
+            config.name = document.getElementById('adminName').value;
+            config.slotDuration = parseInt(document.getElementById('adminSlot').value);
+            config.start = timeToFloat(document.getElementById('adminStart').value);
+            config.end = timeToFloat(document.getElementById('adminEnd').value);
+            config.color = document.getElementById('adminColor').value;
+            
+            saveData(); updateKineSelects(); practitionerFilter.value = kId; renderCalendar(); adminModal.style.display = 'none';
+        }
+
+        function createNewKine() {
+            const newId = 'k' + Date.now(); 
+            kinesConfig[newId] = { name: 'Nouveau', slotDuration: 30, color: '#e53e3e', start: 8, end: 18, pauseStart: 12, pauseEnd: 13, schedule: {} };
+            updateKineSelects(); adminKineSelect.value = newId; loadAdminForm(newId);
+            saveData();
+        }
+
+        // --- GESTION JOUR SPÉCIFIQUE ---
+        window.openDayConfig = function(kineId, dayIndex, dayNameStr) {
+            const schedule = getDailySchedule(kineId, dayIndex);
+            document.getElementById('dayModalKine').value = kineId;
+            document.getElementById('dayModalDay').value = dayIndex;
+            
+            document.getElementById('dayStart').value = floatToTime(schedule.start);
+            document.getElementById('dayEnd').value = floatToTime(schedule.end);
+            document.getElementById('dayPauseStart').value = floatToTime(schedule.pauseStart);
+            document.getElementById('dayPauseEnd').value = floatToTime(schedule.pauseEnd);
+            
+            document.getElementById('dayModalTitle').textContent = `Horaires : ${kinesConfig[kineId].name} (${dayNameStr})`;
+            dayConfigModal.style.display = 'flex';
+        };
+
+        function saveDayConfiguration() {
+            const kId = document.getElementById('dayModalKine').value;
+            const dayIdx = parseInt(document.getElementById('dayModalDay').value);
+            if(!kinesConfig[kId].schedule) kinesConfig[kId].schedule = {};
+            
+            kinesConfig[kId].schedule[dayIdx] = {
+                start: timeToFloat(document.getElementById('dayStart').value),
+                end: timeToFloat(document.getElementById('dayEnd').value),
+                pauseStart: timeToFloat(document.getElementById('dayPauseStart').value),
+                pauseEnd: timeToFloat(document.getElementById('dayPauseEnd').value)
+            };
+            saveData(); dayConfigModal.style.display = 'none'; renderCalendar();
+        }
+
+        function resetDayConfiguration() {
+            const kId = document.getElementById('dayModalKine').value;
+            const dayIdx = parseInt(document.getElementById('dayModalDay').value);
+            if(kinesConfig[kId].schedule) delete kinesConfig[kId].schedule[dayIdx];
+            saveData(); dayConfigModal.style.display = 'none'; renderCalendar();
+        }
+
+        // --- GESTION RDV ---
+        // --- GESTION RDV ---
+        // Fonction pour ajouter dynamiquement un champ téléphone
+        window.addPhoneField = function() {
+            const container = document.getElementById('phoneInputsContainer');
+            const row = document.createElement('div');
+            row.style.cssText = 'display: flex; gap: 5px;';
+            row.innerHTML = `
+                <input type="tel" class="appt-phone-input" placeholder="Autre numéro">
+                <button class="btn-cancel" style="padding: 0 10px; border-color: #e53e3e; color: #e53e3e;" onclick="this.parentElement.remove()" title="Supprimer">-</button>
+            `;
+            container.appendChild(row);
+        };
+
+        // --- GESTION RDV ---
+        window.addPhoneField = function() {
+            const container = document.getElementById('phoneInputsContainer');
+            const row = document.createElement('div');
+            row.style.cssText = 'display: flex; gap: 5px;';
+            row.innerHTML = `
+                <input type="tel" class="appt-phone-input" placeholder="Autre numéro">
+                <button class="btn-cancel" style="padding: 0 10px; border-color: #e53e3e; color: #e53e3e;" onclick="this.parentElement.remove()" title="Supprimer">-</button>
+            `;
+            container.appendChild(row);
+        };
+
+        // Ouverture en mode "NOUVEAU RDV"
+        window.openAddModal = function(kineId, dayIndex, timeStr) {
+            document.getElementById('editApptId').value = '';
+            document.getElementById('newApptKine').value = kineId;
+            document.getElementById('newApptDay').value = dayIndex;
+            document.getElementById('newApptTime').value = timeStr;
+            document.getElementById('newApptDuration').value = kinesConfig[kineId].slotDuration;
+            
+            document.getElementById('newPatientName').value = '';
+            document.getElementById('newApptNotes').value = ''; 
+            document.getElementById('newApptFirstVisit').checked = false;
+            document.getElementById('newApptLastVisit').checked = false;
+            document.getElementById('newApptRemaining').value = '';
+            
+            document.getElementById('phoneInputsContainer').innerHTML = `
+                <div style="display: flex; gap: 5px;">
+                    <input type="tel" class="appt-phone-input" placeholder="06 00 00 00 00">
+                    <button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()" title="Ajouter un numéro">+</button>
+                </div>`;
+            
+            document.getElementById('modalTitle').textContent = `Nouveau RDV - ${kinesConfig[kineId].name} (${timeStr})`;
+            document.getElementById('deleteApptBtn').style.display = 'none'; 
+            document.getElementById('blockSlotBtn').style.display = 'inline-block'; 
+            document.getElementById('confirmApptBtn').textContent = 'Ajouter';
+            
+            document.getElementById('addApptModal').style.display = 'flex';
+            document.getElementById('newPatientName').focus();
+        };
+
+        window.openEditModal = function(appt) {
+            document.getElementById('editApptId').value = appt.id;
+            document.getElementById('newApptKine').value = appt.kineId;
+            document.getElementById('newApptDay').value = appt.dayIndex;
+            document.getElementById('newApptTime').value = appt.timeStr;
+            document.getElementById('newApptDuration').value = appt.duration;
+            
+            document.getElementById('newPatientName').value = appt.patient;
+            document.getElementById('newApptNotes').value = appt.note || '';
+            document.getElementById('newApptFirstVisit').checked = appt.isFirstVisit || false;
+            document.getElementById('newApptLastVisit').checked = appt.isLastVisit || false;
+            document.getElementById('newApptRemaining').value = (appt.remainingSessions !== undefined && appt.remainingSessions !== null) ? appt.remainingSessions : '';
+            
+            const container = document.getElementById('phoneInputsContainer');
+            container.innerHTML = '';
+            if (appt.phones && appt.phones.length > 0) {
+                appt.phones.forEach((phone, index) => {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display: flex; gap: 5px;';
+                    row.innerHTML = `
+                        <input type="tel" class="appt-phone-input" value="${phone}">
+                        <button class="btn-cancel" style="padding: 0 10px; ${index !== 0 ? 'border-color: #e53e3e; color: #e53e3e;' : ''}" onclick="${index === 0 ? 'addPhoneField()' : 'this.parentElement.remove()'}" title="${index === 0 ? 'Ajouter un numéro' : 'Supprimer'}">${index === 0 ? '+' : '-'}</button>
+                    `;
+                    container.appendChild(row);
+                });
+            } else {
+                container.innerHTML = `<div style="display: flex; gap: 5px;"><input type="tel" class="appt-phone-input"><button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()">+</button></div>`;
+            }
+            
+            document.getElementById('modalTitle').textContent = `Modifier RDV - ${kinesConfig[appt.kineId].name} (${appt.timeStr})`;
+            document.getElementById('deleteApptBtn').style.display = 'inline-block'; 
+            document.getElementById('blockSlotBtn').style.display = 'none'; 
+            document.getElementById('confirmApptBtn').textContent = 'Modifier';
+            
+            document.getElementById('addApptModal').style.display = 'flex';
+        };
+
+        // Suppression de RDV depuis la modale
+        function deleteAppointment() {
+            const id = parseInt(document.getElementById('editApptId').value);
+            if(confirm("Confirmer la suppression de ce rendez-vous ?")) {
+                mockAppointments = mockAppointments.filter(a => a.id !== id);
+                saveData(); updatePatientSuggestions();
+                document.getElementById('addApptModal').style.display = 'none';
+                renderCalendar();
+            }
+        }
+
+        function saveNewAppointment() {
+            const phoneInputs = document.querySelectorAll('.appt-phone-input');
+            const phonesArray = Array.from(phoneInputs).map(input => input.value.trim()).filter(val => val !== '');
+            const editId = document.getElementById('editApptId').value;
+            const remainingVal = document.getElementById('newApptRemaining').value;
+
+            const apptData = {
+                kineId: document.getElementById('newApptKine').value,
+                dayIndex: parseInt(document.getElementById('newApptDay').value),
+                timeStr: document.getElementById('newApptTime').value,
+                duration: parseInt(document.getElementById('newApptDuration').value),
+                patient: document.getElementById('newPatientName').value || 'Patient',
+                note: document.getElementById('newApptNotes').value.trim(),
+                isFirstVisit: document.getElementById('newApptFirstVisit').checked,
+                isLastVisit: document.getElementById('newApptLastVisit').checked,
+                remainingSessions: remainingVal !== '' ? parseInt(remainingVal) : null,
+                phones: phonesArray,
+                type: 'rdv'
+            };
+
+            if (editId) {
+                apptData.id = parseInt(editId);
+                const index = mockAppointments.findIndex(a => a.id === apptData.id);
+                if (index !== -1) mockAppointments[index] = apptData;
+            } else {
+                apptData.id = Date.now();
+                mockAppointments.push(apptData);
+            }
+
+            saveData(); updatePatientSuggestions();
+            document.getElementById('addApptModal').style.display = 'none'; 
+            renderCalendar();
+        }
+
+        function saveUnavailableSlot() {
+            mockAppointments.push({
+                id: Date.now(),
+                kineId: document.getElementById('newApptKine').value,
+                dayIndex: parseInt(document.getElementById('newApptDay').value),
+                timeStr: document.getElementById('newApptTime').value,
+                duration: parseInt(document.getElementById('newApptDuration').value),
+                patient: 'Indisponible',
+                type: 'unavailable' 
+            });
+            saveData(); document.getElementById('addApptModal').style.display = 'none'; renderCalendar();
+        }
+
+        // --- RENDU CALENDRIER ---
+        function renderTimeAxis() {
+            const sKine = practitionerFilter.value;
+            let html = '<div class="time-header"></div>';
+            if (sKine === 'all') {
+                for (let h = START_HOUR; h < END_HOUR; h++) 
+                    html += `<div class="time-slot-hour" style="height: ${60 * PIXELS_PER_MINUTE}px;"><span>${h}:00</span></div>`;
+            } else {
+                const slot = kinesConfig[sKine].slotDuration, slotsCount = ((END_HOUR - START_HOUR) * 60) / slot;
+                for (let i = 0; i < slotsCount; i++) {
+                    const mins = i * slot, h = Math.floor(mins / 60) + START_HOUR, m = mins % 60;
+                    html += `<div class="time-slot-hour" style="height: ${slot * PIXELS_PER_MINUTE}px;"><span>${h}:${m.toString().padStart(2,'0')}</span></div>`;
+                }
+            }
+            timeAxis.innerHTML = html;
+        }
+
+        function getDatesOfWeek(refDateStr) {
+            const refDate = new Date(refDateStr);
+            let dayOfWeek = refDate.getDay(); if (dayOfWeek === 0) dayOfWeek = 7;
+            const monday = new Date(refDate); monday.setDate(refDate.getDate() - dayOfWeek + 1);
+            const dates = [];
+            for (let i = 0; i < 5; i++) {
+                const d = new Date(monday); d.setDate(monday.getDate() + i);
+                dates.push(d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }));
+            }
+            return dates;
+        }
+
+        function renderCalendar() {
+            renderTimeAxis(); 
+            const selectedKine = practitionerFilter.value, isMobile = window.innerWidth <= 768;
+            
+            let currentDayIndex = new Date(dateSelect.value).getDay(); 
+            currentDayIndex = (currentDayIndex === 0 || currentDayIndex === 6) ? 0 : currentDayIndex - 1;
+            const weekDates = getDatesOfWeek(dateSelect.value);
+
+            if (!isMobile && selectedKine === 'all') calendarGrid.classList.add('global-view');
+            else calendarGrid.classList.remove('global-view');
+
+            daysWrapper.innerHTML = '';
+            const startDay = isMobile ? currentDayIndex : 0, endDay = isMobile ? currentDayIndex + 1 : 5;
+            const allKinesKeys = Object.keys(kinesConfig);
+
+            for (let i = startDay; i < endDay; i++) {
+                const dayCol = document.createElement('div'); dayCol.className = 'day-column';
+                if (selectedKine !== 'all') dayCol.classList.add('single-practitioner');
+
+                const dayNameStr = `${DAYS_FR[i]} ${weekDates[i]}`;
+                let headerHtml = `<div class="day-header"><span class="day-name">${dayNameStr}</span>`;
+                
+                if(selectedKine !== 'all') {
+                    const activeK = selectedKine === 'all' ? allKinesKeys[0] : selectedKine;
+                    headerHtml += `<div style="margin-top: 5px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                        <span class="nav-name-link" style="font-size: 0.8rem; color: ${kinesConfig[activeK].color}; cursor: pointer; font-weight: bold; background: ${hexToRgba(kinesConfig[activeK].color, 0.1)}; padding: 2px 8px; border-radius: 4px;" onclick="switchToGlobalView()" title="Retour à la vue globale">⬅ ${kinesConfig[activeK].name}</span>
+                        <button class="btn-day-config" onclick="openDayConfig('${activeK}', ${i}, '${dayNameStr}')" style="margin:0;">⚙️ Horaires</button>
+                    </div>`;
+                }
+                headerHtml += `</div>`;
+
+                if (!isMobile && selectedKine === 'all') {
+                    headerHtml += `<div class="sub-header-labels" style="grid-template-columns: repeat(${allKinesKeys.length}, 1fr);">`;
+                    for (const [key, kine] of Object.entries(kinesConfig)) {
+                        headerHtml += `<div style="color: ${kine.color}">
+                            <span class="nav-name-link" style="cursor: pointer; font-weight: bold;" onclick="switchToSingleView('${key}')" title="Voir l'agenda de ${kine.name} uniquement">${kine.name}</span> 
+                            <button class="btn-day-config" onclick="openDayConfig('${key}', ${i}, '${dayNameStr}')">⚙️</button>
+                        </div>`;
+                    }
+                    headerHtml += `</div>`;
+                }
+                dayCol.innerHTML = headerHtml;
+
+                const subGrid = document.createElement('div'); subGrid.className = 'practitioners-subgrid';
+                subGrid.style.gridTemplateColumns = (selectedKine === 'all' && !isMobile) ? `repeat(${allKinesKeys.length}, 1fr)` : '1fr';
+
+                if (selectedKine === 'all' && !isMobile) {
+                    allKinesKeys.forEach(kId => {
+                        if(kinesConfig[kId]) subGrid.appendChild(createKineColumn(kId, i));
+                    });
+                } else {
+                    const activeKine = selectedKine === 'all' ? allKinesKeys[0] : selectedKine;
+                    if(kinesConfig[activeKine]) subGrid.appendChild(createKineColumn(activeKine, i));
+                }
+
+                dayCol.appendChild(subGrid); daysWrapper.appendChild(dayCol);
+            }
+        }
+
+        
+        // --- FONCTION À REMPLACER INTÉGRALEMENT ---
+        function createKineColumn(kineId, dayIndex) {
+            const config = kinesConfig[kineId], col = document.createElement('div');
+            col.className = 'practitioner-column'; col.style.height = `${TOTAL_HEIGHT}px`;
+
+            const gapPx = config.slotDuration * PIXELS_PER_MINUTE; 
+            col.style.backgroundSize = `100% ${gapPx}px`;
+            col.style.backgroundImage = `linear-gradient(to bottom, transparent ${gapPx - 1}px, #a0aec0 ${gapPx - 1}px, #a0aec0 ${gapPx}px)`;
+
+            col.addEventListener('click', (e) => {
+                const clickY = e.clientY - col.getBoundingClientRect().top;
+                const totalMins = Math.floor(clickY / PIXELS_PER_MINUTE);
+                const snappedMins = Math.floor(totalMins / config.slotDuration) * config.slotDuration;
+                openAddModal(kineId, dayIndex, `${(Math.floor(snappedMins / 60) + START_HOUR).toString().padStart(2,'0')}:${(snappedMins % 60).toString().padStart(2, '0')}`);
+            });
+
+            const daySchedule = getDailySchedule(kineId, dayIndex);
+            const drawBlock = (s, e) => {
+                if (s >= e) return;
+                const b = document.createElement('div'); b.className = 'unavailable-block';
+                b.style.top = `${(s - START_HOUR) * 60 * PIXELS_PER_MINUTE}px`; b.style.height = `${(e - s) * 60 * PIXELS_PER_MINUTE}px`;
+                col.appendChild(b);
+            };
+            if (daySchedule.start > START_HOUR) drawBlock(START_HOUR, daySchedule.start);
+            drawBlock(daySchedule.pauseStart, daySchedule.pauseEnd);
+            if (daySchedule.end < END_HOUR) drawBlock(daySchedule.end, END_HOUR);
+
+            mockAppointments.filter(a => a.kineId === kineId && a.dayIndex === dayIndex).forEach(appt => {
+                const el = document.createElement('div'); 
+                
+                // 1. GESTION DES CRÉNEAUX BLOQUÉS (Ce que tu avais vu)
+                if (appt.type === 'unavailable') {
+                    el.className = 'unavailable-block user-blocked-slot';
+                    el.style.top = `${getTopPosition(appt.timeStr)}px`; 
+                    el.style.height = `${appt.duration * PIXELS_PER_MINUTE}px`;
+                    el.innerHTML = `<span style="font-size: 0.7rem; font-weight: bold; color: #718096; padding: 4px; display: block; text-align: center; margin-top: ${appt.duration < 30 ? '-2px' : '0'};">Bloqué</span>`;
+                    
+                    el.addEventListener('click', (e) => { 
+                        e.stopPropagation(); 
+                        if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
+                            mockAppointments = mockAppointments.filter(a => a.id !== appt.id);
+                            saveData(); updatePatientSuggestions(); renderCalendar();
+                        }
+                    });
+                } 
+                // 2. GESTION DES VRAIS RENDEZ-VOUS PATIENTS (C'est ici qu'on a inversé)
+                else {
+                    el.className = 'appointment';
+                    el.style.top = `${getTopPosition(appt.timeStr)}px`; 
+                    el.style.height = `${appt.duration * PIXELS_PER_MINUTE}px`;
+                    el.style.backgroundColor = hexToRgba(config.color, 0.15); 
+                    el.style.borderLeftColor = config.color;
+                    el.style.color = config.color;
+
+                    let tooltipContent = '';
+                    if (appt.isFirstVisit) tooltipContent += '🆕 PREMIER RDV\n';
+                    if (appt.isLastVisit) tooltipContent += '🛑 DERNIER RDV / ARRÊT\n';
+                    if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) tooltipContent += `⏳ ${appt.remainingSessions} séance(s) restante(s)\n`;
+                    if (appt.phones && appt.phones.length > 0) tooltipContent += `📞 ${appt.phones.join(' / ')}\n`;
+                    if (appt.note && appt.note.length > 0) tooltipContent += `📝 ${appt.note}`;
+                    
+                    let noteHtml = '';
+                    if (tooltipContent !== '') {
+                        let icon = '📝';
+                        if (appt.isLastVisit) icon = '🛑';
+                        else if (appt.isFirstVisit) icon = '🆕';
+                        else if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) icon = '⏳';
+                        
+                        noteHtml = `
+                            <div class="note-wrapper">
+                                <span class="note-icon">${icon}</span>
+                                <div class="note-tooltip">${tooltipContent.trim()}</div>
+                            </div>`;
+                    }
+
+                    let prefix = '';
+                    if (appt.isLastVisit) prefix = '🛑 ';
+                    else if (appt.isFirstVisit) prefix = '🆕 ';
+
+                    // INVERSION EFFECTUÉE ICI : Patient en haut, Heure en bas
+                    el.innerHTML = `
+                        <div class="appt-text-content">
+                            <span class="appt-patient-name">${prefix}${appt.patient}</span>
+                            <span class="appt-time-details">${appt.timeStr} (${appt.duration}min)</span>
+                        </div>
+                        ${noteHtml}
+                    `;
+                    
+                    el.addEventListener('click', (e) => { 
+                        e.stopPropagation(); 
+                        openEditModal(appt);
+                    });
+                }
+                
+                col.appendChild(el);
+            });
+            return col;
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
