@@ -41,8 +41,7 @@
         
         label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted-app); text-transform: uppercase; }
         
-        /* Ajout de textarea dans les styles généraux des inputs */
-        select, input[type="date"], input[type="password"], input[type="number"], input[type="text"], input[type="time"], input[type="color"], textarea {
+        select, input[type="date"], input[type="password"], input[type="number"], input[type="text"], input[type="time"], input[type="color"], input[type="tel"], textarea {
             width: 100%; padding: 8px 12px; border: 1px solid #4a5568; background-color: #1a202c; color: white;
             border-radius: 6px; font-size: 0.9rem; outline: none; font-family: inherit;
         }
@@ -101,65 +100,40 @@
             background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.03) 10px, rgba(0,0,0,0.03) 20px);
             z-index: 0; border-bottom: 1px solid var(--border-color);
         }
-        
         .user-blocked-slot {
             pointer-events: auto !important; z-index: 1 !important; cursor: pointer;
-            border-left: 4px solid #a0aec0; border-radius: 4px; left: 2px; right: 2px;
+            border-left: 4px solid #a0aec0; border-radius: 4px;
         }
         .user-blocked-slot:hover { background-color: rgba(229, 62, 62, 0.1); }
 
-        /* --- CORRECTION DU BUG D'AFFICHAGE DES BULLES D'INFO --- */
+        /* Modifs des RDV */
         .appointment {
-            position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 4px 6px; font-size: 0.8rem;
-            /* Le texte est masqué s'il dépasse... */
-            overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
-            border-left: 4px solid; cursor: pointer; z-index: 2; transition: transform 0.1s;
-        }
-        /* ... Mais au survol, on libère l'espace et on passe la case au premier plan ! */
-        .appointment:hover { 
-            transform: scale(1.01); 
-            z-index: 50; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.15); 
-            overflow: visible; 
-        }
-        /* Modifs des RDV pour laisser sortir la bulle d'info */
-        .appointment {
-            position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 4px 6px; font-size: 0.8rem;
+            position: absolute; border-radius: 4px; padding: 4px 6px; font-size: 0.8rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid; cursor: pointer; z-index: 2; transition: transform 0.1s;
             display: flex; justify-content: space-between; align-items: flex-start;
         }
         .appointment:hover { transform: scale(1.01); z-index: 50; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
-        
-        /* --- NOUVEAU : Styles pour le nom en gras et l'horaire affiné --- */
         .appointment .appt-patient-name { font-weight: 700; display: block; font-size: 0.8rem; margin-bottom: 2px; }
         .appointment .appt-time-details { display: block; font-size: 0.7rem; opacity: 0.85; }
 
-        .appt-text-content {
-            overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;
-        }
+        .appt-text-content { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1; }
 
-        /* Ajustement de la bulle d'info (Notes) */
-        .note-wrapper {
-            position: absolute; top: 4px; right: 4px; display: inline-block;
-        }
-        .note-icon {
-            font-size: 0.85rem; cursor: help;
-        }
-        .note-tooltip {
+        /* --- BULLE D'INFO (NOTES) --- */
+        .note-wrapper { position: relative; display: inline-block; flex-shrink: 0; margin-left: 4px; }
+        .note-icon { font-size: 0.85rem; }
+        
+        .appointment .note-tooltip {
             visibility: hidden; background-color: var(--bg-panel); color: var(--text-app);
             text-align: left; border-radius: 6px; padding: 8px 10px; position: absolute;
-            z-index: 100; /* Assure que la note passe au-dessus de tout */
-            top: 20px; /* Descend un peu la bulle pour ne pas cacher l'icône */
-            right: 0; min-width: 200px; max-width: 300px;
-            white-space: pre-wrap; box-shadow: 0 4px 12px rgba(0,0,0,0.6); 
-            opacity: 0; transition: opacity 0.2s; border: 1px solid #4a5568; 
-            font-weight: normal; pointer-events: none;
+            z-index: 1000; top: 90%; left: 5px; width: max-content; max-width: 260px;
+            white-space: pre-wrap; box-shadow: 0 4px 12px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.2s;
+            border: 1px solid #4a5568; font-weight: normal; pointer-events: none;
         }
-        .note-wrapper:hover .note-tooltip { visibility: visible; opacity: 1; }
+        .appointment:hover .note-tooltip { visibility: visible; opacity: 1; }
 
         .sub-header-labels {
             display: grid; width: 100%; background: #edf2f7; font-size: 0.7rem; text-align: center; font-weight: 600;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color); position: sticky; top: 45px; z-index: 2; 
         }
         .sub-header-labels > div { padding: 4px 0; border-right: 1px solid var(--border-color); position: relative; }
         .sub-header-labels > div:last-child { border-right: none; }
@@ -169,7 +143,6 @@
             opacity: 0.3; transition: opacity 0.2s;
         }
         .sub-header-labels > div:hover .btn-day-config, .day-header:hover .btn-day-config { opacity: 1; }
-
         .nav-name-link { transition: opacity 0.2s; }
         .nav-name-link:hover { opacity: 0.7; }
 
@@ -178,10 +151,23 @@
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); 
             backdrop-filter: blur(2px); display: none; justify-content: center; align-items: center; z-index: 100;
         }
-        .modal-content { background: var(--bg-panel); color: var(--text-app); padding: 20px; border-radius: 10px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); }
+        .modal-content { 
+            background: var(--bg-panel); color: var(--text-app); padding: 20px; 
+            border-radius: 10px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); 
+            max-height: 95vh; overflow-y: auto; 
+        }
+        .modal-content::-webkit-scrollbar, #adminTypesContainer::-webkit-scrollbar { width: 6px; }
+        .modal-content::-webkit-scrollbar-thumb, #adminTypesContainer::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
+        
         .modal-content h3 { margin-bottom: 15px; color: #63b3ed; font-size: 1.1rem;}
         .modal-body { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+        /* Encadré d'options RDV */
+        .options-box {
+            display: flex; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.15); 
+            padding: 10px; border-radius: 6px; border: 1px solid #4a5568; margin-top: -5px; margin-bottom: 5px;
+        }
 
         @media (max-width: 768px) {
             body { overflow: auto; }
@@ -210,30 +196,39 @@
                     <datalist id="patientsList"></datalist>
                 </div>
                 
-                <!-- NOUVEAU : Grille d'options de suivi -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: -5px; margin-bottom: 5px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="newApptFirstVisit" style="width: 18px; height: 18px; cursor: pointer;">
+                <div class="options-box">
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" id="newApptImportant" style="width: 16px; height: 16px; cursor: pointer;">
+                        <label for="newApptImportant" style="margin: 0; cursor: pointer; color: #fc8181; font-weight: bold; text-transform: none;">Important</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" id="newApptFirstVisit" style="width: 16px; height: 16px; cursor: pointer;">
                         <label for="newApptFirstVisit" style="margin: 0; cursor: pointer; color: #63b3ed; text-transform: none;">1er RDV</label>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="newApptLastVisit" style="width: 18px; height: 18px; cursor: pointer;">
-                        <label for="newApptLastVisit" style="margin: 0; cursor: pointer; color: #fc8181; text-transform: none;">Dernier RDV</label>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" id="newApptLastVisit" style="width: 16px; height: 16px; cursor: pointer;">
+                        <label for="newApptLastVisit" style="margin: 0; cursor: pointer; color: #f6ad55; text-transform: none;">Dernier</label>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px; grid-column: span 2;">
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" id="newApptCV" style="width: 16px; height: 16px; cursor: pointer;">
+                        <label for="newApptCV" style="margin: 0; cursor: pointer; color: #68d391; font-weight: bold; text-transform: none;">CV 💳</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 5px;">
                         <label for="newApptRemaining" style="margin: 0; text-transform: none; color: #a0aec0;">Séances restantes :</label>
-                        <input type="number" id="newApptRemaining" style="width: 70px; height: 30px; padding: 2px 8px;" min="0" placeholder="Ex: 5">
+                        <input type="number" id="newApptRemaining" style="width: 70px; height: 30px; padding: 2px 8px;" min="0">
                     </div>
                 </div>
 
                 <div class="control-group">
+                    <label>Type de RDV</label>
+                    <select id="newApptType">
+                        <!-- Rempli dynamiquement -->
+                    </select>
+                </div>
+
+                <div class="control-group">
                     <label>Téléphone(s)</label>
-                    <div id="phoneInputsContainer" style="display: flex; flex-direction: column; gap: 5px;">
-                        <div style="display: flex; gap: 5px;">
-                            <input type="tel" class="appt-phone-input" placeholder="06 00 00 00 00">
-                            <button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()" title="Ajouter un numéro">+</button>
-                        </div>
-                    </div>
+                    <div id="phoneInputsContainer" style="display: flex; flex-direction: column; gap: 5px;"></div>
                 </div>
                 <div class="control-group">
                     <label>Durée (min)</label>
@@ -243,21 +238,23 @@
                     <label>Notes</label>
                     <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..."></textarea>
                 </div>
-                <input type="hidden" id="editApptId">
-                <input type="hidden" id="newApptKine"><input type="hidden" id="newApptDay"><input type="hidden" id="newApptTime">
+                <input type="hidden" id="editApptId"><input type="hidden" id="newApptKine"><input type="hidden" id="newApptDay"><input type="hidden" id="newApptTime">
             </div>
-            <div class="modal-actions">
-                <button class="btn-cancel" id="cancelApptBtn">Annuler</button>
-                <button class="btn-cancel" id="deleteApptBtn" style="border-color: #e53e3e; color: #e53e3e; display: none;" title="Supprimer ce rendez-vous">Supprimer</button>
-                <button class="btn-cancel" id="blockSlotBtn" style="border-color: #e53e3e; color: #e53e3e;" title="Rendre indisponible">Bloquer</button>
-                <button class="btn-save" id="confirmApptBtn">Ajouter</button>
+            <div class="modal-actions" style="justify-content: space-between; align-items: center;">
+                <button class="btn-cancel" id="addSameSlotBtn" style="border-color: #3182ce; color: #3182ce; display: none; padding: 4px 10px; font-size: 0.8rem;" title="Ajouter un autre RDV à la même heure">+ Même heure</button>
+                <div style="display: flex; gap: 10px; margin-left: auto;">
+                    <button class="btn-cancel" id="cancelApptBtn">Annuler</button>
+                    <button class="btn-cancel" id="deleteApptBtn" style="border-color: #e53e3e; color: #e53e3e; display: none;">Supprimer</button>
+                    <button class="btn-cancel" id="blockSlotBtn" style="border-color: #e53e3e; color: #e53e3e;">Bloquer</button>
+                    <button class="btn-save" id="confirmApptBtn">Ajouter</button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- MODALE : GESTION DES KINÉS -->
     <div class="modal-overlay" id="adminModal">
-        <div class="modal-content" style="width: 380px;">
+        <div class="modal-content" style="width: 400px;">
             <h3>⚙️ Config globale Praticiens</h3>
             <div class="modal-body">
                 <div class="control-group"><label>Praticien</label><select id="adminKineSelect"></select></div>
@@ -265,17 +262,29 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="control-group"><label>Arrivée</label><input type="time" id="adminStart"></div>
                     <div class="control-group"><label>Départ</label><input type="time" id="adminEnd"></div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div class="control-group">
-                        <label>Créneau</label>
-                        <select id="adminSlot"><option value="20">20 min</option><option value="30">30 min</option></select>
-                    </div>
+                    <div class="control-group"><label>Créneau</label><select id="adminSlot"><option value="20">20 min</option><option value="30">30 min</option></select></div>
                     <div class="control-group"><label>Couleur</label><input type="color" id="adminColor" style="padding: 2px;"></div>
+                </div>
+
+                <hr style="border-color: #4a5568; margin: 10px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="color: #63b3ed; margin: 0;">Types de RDV (Cocher pour lier au kiné)</label>
+                    <button class="btn-cancel" onclick="addNewTypeRow()" style="padding: 2px 8px; font-size: 0.75rem; border-color: #3182ce; color: #3182ce;">+ Ajouter</button>
+                </div>
+                
+                <!-- Zone Dynamique des Types -->
+                <div id="adminTypesContainer" style="display: flex; flex-direction: column; gap: 8px; max-height: 160px; overflow-y: auto; padding-right: 5px;"></div>
+
+                <hr style="border-color: #4a5568; margin: 10px 0;">
+                <label style="color: #63b3ed;">Sauvegarde des données</label>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-cancel" onclick="exportData()" style="flex: 1; border-color: #38a169; color: #38a169;">💾 Exporter</button>
+                    <button class="btn-cancel" onclick="document.getElementById('importFile').click()" style="flex: 1; border-color: #d69e2e; color: #d69e2e;">📂 Importer</button>
+                    <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
                 </div>
             </div>
             <div class="modal-actions" style="justify-content: space-between;">
-                <button class="btn-cancel" id="addKineBtn" style="border-color: #319795; color: #319795;">+ Nouveau</button>
+                <button class="btn-cancel" id="addKineBtn" style="border-color: #319795; color: #319795;">+ Nouveau Kiné</button>
                 <div>
                     <button class="btn-cancel" id="closeAdminBtn">Fermer</button>
                     <button class="btn-save" id="saveKineBtn">Appliquer</button>
@@ -293,14 +302,12 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="control-group"><label>Arrivée</label><input type="time" id="dayStart"></div>
                     <div class="control-group"><label>Départ</label><input type="time" id="dayEnd"></div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="control-group"><label>Début Pause</label><input type="time" id="dayPauseStart"></div>
                     <div class="control-group"><label>Fin Pause</label><input type="time" id="dayPauseEnd"></div>
                 </div>
             </div>
             <div class="modal-actions" style="justify-content: space-between;">
-                <button class="btn-cancel" id="resetDayBtn" style="border-color: #e53e3e; color: #e53e3e;" title="Remettre les horaires par défaut">Réinitialiser</button>
+                <button class="btn-cancel" id="resetDayBtn" style="border-color: #e53e3e; color: #e53e3e;">Réinitialiser</button>
                 <div>
                     <button class="btn-cancel" onclick="document.getElementById('dayConfigModal').style.display='none'">Fermer</button>
                     <button class="btn-save" id="saveDayBtn">Valider</button>
@@ -343,18 +350,47 @@
         const DAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
 
         let kinesConfig = JSON.parse(localStorage.getItem('kinesConfig')) || {
-            'k1': { name: 'Kiné A', slotDuration: 30, color: '#319795', start: 8.0, end: 18.5, pauseStart: 12.0, pauseEnd: 13.5, schedule: {} }, 
-            'k2': { name: 'Kiné B', slotDuration: 20, color: '#805ad5', start: 7.0, end: 16.0, pauseStart: 12.0, pauseEnd: 12.5, schedule: {} }
+            'k1': { name: 'Kiné A', slotDuration: 30, color: '#319795', start: 8.0, end: 18.5, pauseStart: 12.0, pauseEnd: 13.5, allowedTypes: ['t1', 't2', 't3'], schedule: {} }
         };
-        let mockAppointments = JSON.parse(localStorage.getItem('mockAppointments')) || [
-            // J'ai ajouté une note factice dans le mock de base pour que tu voies le rendu immédiatement
-            { id: 1, kineId: 'k1', dayIndex: 0, timeStr: '08:30', duration: 30, patient: 'Mme Martin', type: 'rdv', note: 'Première séance post-opératoire.\nNe pas oublier le dossier.' }
-        ];
+        let mockAppointments = JSON.parse(localStorage.getItem('mockAppointments')) || [];
+        
+        let apptTypesConfig = JSON.parse(localStorage.getItem('apptTypesConfig')) || {
+            't1': { label: 'Bilan', color: '#805ad5' },
+            't2': { label: 'Domicile', color: '#38a169' },
+            't3': { label: 'Ondes de choc', color: '#d69e2e' }
+        };
 
         function saveData() {
             localStorage.setItem('kinesConfig', JSON.stringify(kinesConfig));
             localStorage.setItem('mockAppointments', JSON.stringify(mockAppointments));
+            localStorage.setItem('apptTypesConfig', JSON.stringify(apptTypesConfig));
         }
+
+        // --- EXPORT / IMPORT JSON ---
+        window.exportData = function() {
+            const data = { kinesConfig, mockAppointments, apptTypesConfig };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+            const dlAnchorNode = document.createElement('a');
+            dlAnchorNode.setAttribute("href", dataStr);
+            dlAnchorNode.setAttribute("download", "planning_backup_" + new Date().toISOString().split('T')[0] + ".json");
+            document.body.appendChild(dlAnchorNode); dlAnchorNode.click(); dlAnchorNode.remove();
+        };
+
+        window.importData = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.kinesConfig) kinesConfig = imported.kinesConfig;
+                    if (imported.mockAppointments) mockAppointments = imported.mockAppointments;
+                    if (imported.apptTypesConfig) apptTypesConfig = imported.apptTypesConfig;
+                    saveData(); alert("Restauration réussie ! Le planning va se recharger."); location.reload();
+                } catch (err) { alert("Erreur lors de la lecture du fichier JSON."); }
+            };
+            reader.readAsText(file);
+        };
 
         // --- UTILITAIRES ---
         function timeToFloat(timeStr) {
@@ -362,26 +398,22 @@
             const [h, m] = timeStr.split(':').map(Number);
             return h + (m / 60);
         }
-
         function floatToTime(f) {
             if (isNaN(f)) return "00:00";
             const h = Math.floor(f);
             const m = Math.round((f - h) * 60);
             return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
         }
-
         function hexToRgba(hex, alpha) {
             let r = 0, g = 0, b = 0;
             if (hex.length === 7) { r = parseInt(hex.slice(1, 3), 16); g = parseInt(hex.slice(3, 5), 16); b = parseInt(hex.slice(5, 7), 16); }
             return `rgba(${r}, ${g}, ${b}, ${alpha})`;
         }
-
         function getDailySchedule(kineId, dayIndex) {
             const config = kinesConfig[kineId];
             if (config.schedule && config.schedule[dayIndex]) return config.schedule[dayIndex];
             return { start: config.start, end: config.end, pauseStart: config.pauseStart, pauseEnd: config.pauseEnd };
         }
-
         function getTopPosition(timeStr) {
             const [h, m] = timeStr.split(':').map(Number);
             return (((h - START_HOUR) * 60) + m) * PIXELS_PER_MINUTE;
@@ -391,20 +423,15 @@
         const timeAxis = document.getElementById('timeAxis'), daysWrapper = document.getElementById('daysWrapper');
         const practitionerFilter = document.getElementById('practitionerFilter'), dateSelect = document.getElementById('dateSelect');
         const calendarGrid = document.getElementById('mainCalendarGrid');
-        
         const adminModal = document.getElementById('adminModal'), adminKineSelect = document.getElementById('adminKineSelect');
         const dayConfigModal = document.getElementById('dayConfigModal');
 
         // --- AUTO-COMPLÉTION PATIENTS ---
         function updatePatientSuggestions() {
             const datalist = document.getElementById('patientsList');
-            datalist.innerHTML = ''; // On vide la liste actuelle
-            
-            // On récupère tous les noms, on enlève les vides, et on utilise un Set pour éviter les doublons
+            datalist.innerHTML = ''; 
             const allNames = mockAppointments.map(appt => appt.patient).filter(name => name && name !== 'Indisponible' && name !== 'Patient');
             const uniqueNames = [...new Set(allNames)].sort();
-            
-            // On crée une <option> pour chaque patient unique
             uniqueNames.forEach(name => {
                 const option = document.createElement('option');
                 option.value = name;
@@ -435,6 +462,14 @@
             document.getElementById('deleteApptBtn').addEventListener('click', deleteAppointment);
             document.getElementById('blockSlotBtn').addEventListener('click', saveUnavailableSlot);
 
+            document.getElementById('addSameSlotBtn').addEventListener('click', () => {
+                const kineId = document.getElementById('newApptKine').value;
+                const dayIndex = parseInt(document.getElementById('newApptDay').value);
+                const timeStr = document.getElementById('newApptTime').value;
+                document.getElementById('addApptModal').style.display = 'none';
+                setTimeout(() => openAddModal(kineId, dayIndex, timeStr), 50);
+            });
+
             document.getElementById('saveDayBtn').addEventListener('click', saveDayConfiguration);
             document.getElementById('resetDayBtn').addEventListener('click', resetDayConfiguration);
 
@@ -448,16 +483,8 @@
         }
 
         // --- NAVIGATION VUES ---
-        window.switchToSingleView = function(kineId) {
-            practitionerFilter.value = kineId;
-            renderCalendar();
-        };
-
-        window.switchToGlobalView = function() {
-            practitionerFilter.value = 'all';
-            renderCalendar();
-        };
-
+        window.switchToSingleView = function(kineId) { practitionerFilter.value = kineId; renderCalendar(); };
+        window.switchToGlobalView = function() { practitionerFilter.value = 'all'; renderCalendar(); };
         function shiftDate(days) {
             const d = new Date(dateSelect.value); d.setDate(d.getDate() + days);
             dateSelect.value = d.toISOString().split('T')[0]; renderCalendar();
@@ -473,6 +500,45 @@
         }
 
         // --- GESTION ADMIN GLOBALE ---
+        function renderAdminTypes(kineId) {
+            const container = document.getElementById('adminTypesContainer');
+            container.innerHTML = '';
+            const allowed = kinesConfig[kineId].allowedTypes || [];
+            
+            for (const [typeKey, typeData] of Object.entries(apptTypesConfig)) {
+                const isChecked = allowed.includes(typeKey) ? 'checked' : '';
+                container.innerHTML += `
+                    <div style="display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center;" class="type-row" data-key="${typeKey}">
+                        <input type="checkbox" class="type-kine-check" ${isChecked} title="Assigner à ce praticien" style="cursor: pointer; width: 16px; height: 16px;">
+                        <input type="text" class="type-label" value="${typeData.label}" placeholder="Nom du type">
+                        <input type="color" class="type-color" value="${typeData.color}" style="padding: 2px; width: 40px; height: 35px;">
+                        <button class="btn-cancel" onclick="deleteType('${typeKey}')" style="padding: 0 8px; border-color: #e53e3e; color: #e53e3e;" title="Supprimer ce type">X</button>
+                    </div>
+                `;
+            }
+        }
+
+        window.addNewTypeRow = function() {
+            const newKey = 't' + Date.now();
+            apptTypesConfig[newKey] = { label: 'Nouveau Type', color: '#cbd5e0' };
+            const kId = document.getElementById('adminKineSelect').value;
+            if(!kinesConfig[kId].allowedTypes) kinesConfig[kId].allowedTypes = [];
+            kinesConfig[kId].allowedTypes.push(newKey);
+            renderAdminTypes(kId);
+        };
+
+        window.deleteType = function(typeKey) {
+            if(confirm('Supprimer définitivement ce type de RDV ?')) {
+                delete apptTypesConfig[typeKey];
+                for(let k in kinesConfig) {
+                    if(kinesConfig[k].allowedTypes) {
+                        kinesConfig[k].allowedTypes = kinesConfig[k].allowedTypes.filter(t => t !== typeKey);
+                    }
+                }
+                renderAdminTypes(document.getElementById('adminKineSelect').value);
+            }
+        };
+
         function loadAdminForm(kineId) {
             if(!kinesConfig[kineId]) return;
             const config = kinesConfig[kineId];
@@ -481,6 +547,7 @@
             document.getElementById('adminStart').value = floatToTime(config.start);
             document.getElementById('adminEnd').value = floatToTime(config.end);
             document.getElementById('adminColor').value = config.color;
+            renderAdminTypes(kineId);
         }
 
         function saveKineConfiguration() {
@@ -491,14 +558,26 @@
             config.end = timeToFloat(document.getElementById('adminEnd').value);
             config.color = document.getElementById('adminColor').value;
             
+            let allowed = [];
+            const rows = document.querySelectorAll('#adminTypesContainer .type-row');
+            rows.forEach(row => {
+                const key = row.getAttribute('data-key');
+                const isChecked = row.querySelector('.type-kine-check').checked;
+                const label = row.querySelector('.type-label').value;
+                const color = row.querySelector('.type-color').value;
+                
+                apptTypesConfig[key] = { label, color };
+                if (isChecked) allowed.push(key);
+            });
+            config.allowedTypes = allowed;
+            
             saveData(); updateKineSelects(); practitionerFilter.value = kId; renderCalendar(); adminModal.style.display = 'none';
         }
 
         function createNewKine() {
             const newId = 'k' + Date.now(); 
-            kinesConfig[newId] = { name: 'Nouveau', slotDuration: 30, color: '#e53e3e', start: 8, end: 18, pauseStart: 12, pauseEnd: 13, schedule: {} };
-            updateKineSelects(); adminKineSelect.value = newId; loadAdminForm(newId);
-            saveData();
+            kinesConfig[newId] = { name: 'Nouveau', slotDuration: 30, color: '#e53e3e', start: 8, end: 18, pauseStart: 12, pauseEnd: 13, allowedTypes: Object.keys(apptTypesConfig), schedule: {} };
+            updateKineSelects(); adminKineSelect.value = newId; loadAdminForm(newId); saveData();
         }
 
         // --- GESTION JOUR SPÉCIFIQUE ---
@@ -506,12 +585,10 @@
             const schedule = getDailySchedule(kineId, dayIndex);
             document.getElementById('dayModalKine').value = kineId;
             document.getElementById('dayModalDay').value = dayIndex;
-            
             document.getElementById('dayStart').value = floatToTime(schedule.start);
             document.getElementById('dayEnd').value = floatToTime(schedule.end);
             document.getElementById('dayPauseStart').value = floatToTime(schedule.pauseStart);
             document.getElementById('dayPauseEnd').value = floatToTime(schedule.pauseEnd);
-            
             document.getElementById('dayModalTitle').textContent = `Horaires : ${kinesConfig[kineId].name} (${dayNameStr})`;
             dayConfigModal.style.display = 'flex';
         };
@@ -520,12 +597,9 @@
             const kId = document.getElementById('dayModalKine').value;
             const dayIdx = parseInt(document.getElementById('dayModalDay').value);
             if(!kinesConfig[kId].schedule) kinesConfig[kId].schedule = {};
-            
             kinesConfig[kId].schedule[dayIdx] = {
-                start: timeToFloat(document.getElementById('dayStart').value),
-                end: timeToFloat(document.getElementById('dayEnd').value),
-                pauseStart: timeToFloat(document.getElementById('dayPauseStart').value),
-                pauseEnd: timeToFloat(document.getElementById('dayPauseEnd').value)
+                start: timeToFloat(document.getElementById('dayStart').value), end: timeToFloat(document.getElementById('dayEnd').value),
+                pauseStart: timeToFloat(document.getElementById('dayPauseStart').value), pauseEnd: timeToFloat(document.getElementById('dayPauseEnd').value)
             };
             saveData(); dayConfigModal.style.display = 'none'; renderCalendar();
         }
@@ -538,33 +612,31 @@
         }
 
         // --- GESTION RDV ---
-        // --- GESTION RDV ---
-        // Fonction pour ajouter dynamiquement un champ téléphone
+        function updateTypeSelectLabels(kineId) {
+            const select = document.getElementById('newApptType');
+            const config = kinesConfig[kineId];
+            const allowed = config.allowedTypes || [];
+            
+            let html = '<option value="">Standard (Couleur du Kiné)</option>';
+            allowed.forEach(typeKey => {
+                if(apptTypesConfig[typeKey]) {
+                    html += `<option value="${typeKey}">${apptTypesConfig[typeKey].label}</option>`;
+                }
+            });
+            select.innerHTML = html;
+        }
+
         window.addPhoneField = function() {
             const container = document.getElementById('phoneInputsContainer');
             const row = document.createElement('div');
             row.style.cssText = 'display: flex; gap: 5px;';
-            row.innerHTML = `
-                <input type="tel" class="appt-phone-input" placeholder="Autre numéro">
-                <button class="btn-cancel" style="padding: 0 10px; border-color: #e53e3e; color: #e53e3e;" onclick="this.parentElement.remove()" title="Supprimer">-</button>
-            `;
+            row.innerHTML = `<input type="tel" class="appt-phone-input" placeholder="Autre numéro">
+                <button class="btn-cancel" style="padding: 0 10px; border-color: #e53e3e; color: #e53e3e;" onclick="this.parentElement.remove()">-</button>`;
             container.appendChild(row);
         };
 
-        // --- GESTION RDV ---
-        window.addPhoneField = function() {
-            const container = document.getElementById('phoneInputsContainer');
-            const row = document.createElement('div');
-            row.style.cssText = 'display: flex; gap: 5px;';
-            row.innerHTML = `
-                <input type="tel" class="appt-phone-input" placeholder="Autre numéro">
-                <button class="btn-cancel" style="padding: 0 10px; border-color: #e53e3e; color: #e53e3e;" onclick="this.parentElement.remove()" title="Supprimer">-</button>
-            `;
-            container.appendChild(row);
-        };
-
-        // Ouverture en mode "NOUVEAU RDV"
         window.openAddModal = function(kineId, dayIndex, timeStr) {
+            updateTypeSelectLabels(kineId); 
             document.getElementById('editApptId').value = '';
             document.getElementById('newApptKine').value = kineId;
             document.getElementById('newApptDay').value = dayIndex;
@@ -573,17 +645,21 @@
             
             document.getElementById('newPatientName').value = '';
             document.getElementById('newApptNotes').value = ''; 
+            document.getElementById('newApptType').value = '';
+            document.getElementById('newApptImportant').checked = false;
             document.getElementById('newApptFirstVisit').checked = false;
             document.getElementById('newApptLastVisit').checked = false;
+            document.getElementById('newApptCV').checked = false;
             document.getElementById('newApptRemaining').value = '';
             
             document.getElementById('phoneInputsContainer').innerHTML = `
                 <div style="display: flex; gap: 5px;">
                     <input type="tel" class="appt-phone-input" placeholder="06 00 00 00 00">
-                    <button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()" title="Ajouter un numéro">+</button>
+                    <button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()">+</button>
                 </div>`;
             
             document.getElementById('modalTitle').textContent = `Nouveau RDV - ${kinesConfig[kineId].name} (${timeStr})`;
+            document.getElementById('addSameSlotBtn').style.display = 'none';
             document.getElementById('deleteApptBtn').style.display = 'none'; 
             document.getElementById('blockSlotBtn').style.display = 'inline-block'; 
             document.getElementById('confirmApptBtn').textContent = 'Ajouter';
@@ -593,6 +669,7 @@
         };
 
         window.openEditModal = function(appt) {
+            updateTypeSelectLabels(appt.kineId);
             document.getElementById('editApptId').value = appt.id;
             document.getElementById('newApptKine').value = appt.kineId;
             document.getElementById('newApptDay').value = appt.dayIndex;
@@ -601,27 +678,29 @@
             
             document.getElementById('newPatientName').value = appt.patient;
             document.getElementById('newApptNotes').value = appt.note || '';
+            document.getElementById('newApptType').value = appt.apptType || '';
+            document.getElementById('newApptImportant').checked = appt.isImportant || false;
             document.getElementById('newApptFirstVisit').checked = appt.isFirstVisit || false;
             document.getElementById('newApptLastVisit').checked = appt.isLastVisit || false;
+            document.getElementById('newApptCV').checked = appt.isCV || false;
             document.getElementById('newApptRemaining').value = (appt.remainingSessions !== undefined && appt.remainingSessions !== null) ? appt.remainingSessions : '';
             
             const container = document.getElementById('phoneInputsContainer');
             container.innerHTML = '';
             if (appt.phones && appt.phones.length > 0) {
                 appt.phones.forEach((phone, index) => {
-                    const row = document.createElement('div');
-                    row.style.cssText = 'display: flex; gap: 5px;';
-                    row.innerHTML = `
-                        <input type="tel" class="appt-phone-input" value="${phone}">
-                        <button class="btn-cancel" style="padding: 0 10px; ${index !== 0 ? 'border-color: #e53e3e; color: #e53e3e;' : ''}" onclick="${index === 0 ? 'addPhoneField()' : 'this.parentElement.remove()'}" title="${index === 0 ? 'Ajouter un numéro' : 'Supprimer'}">${index === 0 ? '+' : '-'}</button>
-                    `;
-                    container.appendChild(row);
+                    container.innerHTML += `
+                        <div style="display: flex; gap: 5px;">
+                            <input type="tel" class="appt-phone-input" value="${phone}">
+                            <button class="btn-cancel" style="padding: 0 10px; ${index !== 0 ? 'border-color: #e53e3e; color: #e53e3e;' : ''}" onclick="${index === 0 ? 'addPhoneField()' : 'this.parentElement.remove()'}">${index === 0 ? '+' : '-'}</button>
+                        </div>`;
                 });
             } else {
                 container.innerHTML = `<div style="display: flex; gap: 5px;"><input type="tel" class="appt-phone-input"><button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()">+</button></div>`;
             }
             
             document.getElementById('modalTitle').textContent = `Modifier RDV - ${kinesConfig[appt.kineId].name} (${appt.timeStr})`;
+            document.getElementById('addSameSlotBtn').style.display = 'inline-block'; 
             document.getElementById('deleteApptBtn').style.display = 'inline-block'; 
             document.getElementById('blockSlotBtn').style.display = 'none'; 
             document.getElementById('confirmApptBtn').textContent = 'Modifier';
@@ -629,14 +708,11 @@
             document.getElementById('addApptModal').style.display = 'flex';
         };
 
-        // Suppression de RDV depuis la modale
         function deleteAppointment() {
             const id = parseInt(document.getElementById('editApptId').value);
             if(confirm("Confirmer la suppression de ce rendez-vous ?")) {
                 mockAppointments = mockAppointments.filter(a => a.id !== id);
-                saveData(); updatePatientSuggestions();
-                document.getElementById('addApptModal').style.display = 'none';
-                renderCalendar();
+                saveData(); updatePatientSuggestions(); document.getElementById('addApptModal').style.display = 'none'; renderCalendar();
             }
         }
 
@@ -653,8 +729,11 @@
                 duration: parseInt(document.getElementById('newApptDuration').value),
                 patient: document.getElementById('newPatientName').value || 'Patient',
                 note: document.getElementById('newApptNotes').value.trim(),
+                apptType: document.getElementById('newApptType').value,
+                isImportant: document.getElementById('newApptImportant').checked,
                 isFirstVisit: document.getElementById('newApptFirstVisit').checked,
                 isLastVisit: document.getElementById('newApptLastVisit').checked,
+                isCV: document.getElementById('newApptCV').checked,
                 remainingSessions: remainingVal !== '' ? parseInt(remainingVal) : null,
                 phones: phonesArray,
                 type: 'rdv'
@@ -669,20 +748,14 @@
                 mockAppointments.push(apptData);
             }
 
-            saveData(); updatePatientSuggestions();
-            document.getElementById('addApptModal').style.display = 'none'; 
-            renderCalendar();
+            saveData(); updatePatientSuggestions(); document.getElementById('addApptModal').style.display = 'none'; renderCalendar();
         }
 
         function saveUnavailableSlot() {
             mockAppointments.push({
-                id: Date.now(),
-                kineId: document.getElementById('newApptKine').value,
-                dayIndex: parseInt(document.getElementById('newApptDay').value),
-                timeStr: document.getElementById('newApptTime').value,
-                duration: parseInt(document.getElementById('newApptDuration').value),
-                patient: 'Indisponible',
-                type: 'unavailable' 
+                id: Date.now(), kineId: document.getElementById('newApptKine').value, dayIndex: parseInt(document.getElementById('newApptDay').value),
+                timeStr: document.getElementById('newApptTime').value, duration: parseInt(document.getElementById('newApptDuration').value),
+                patient: 'Indisponible', type: 'unavailable' 
             });
             saveData(); document.getElementById('addApptModal').style.display = 'none'; renderCalendar();
         }
@@ -775,8 +848,6 @@
             }
         }
 
-        
-        // --- FONCTION À REMPLACER INTÉGRALEMENT ---
         function createKineColumn(kineId, dayIndex) {
             const config = kinesConfig[kineId], col = document.createElement('div');
             col.className = 'practitioner-column'; col.style.height = `${TOTAL_HEIGHT}px`;
@@ -803,74 +874,95 @@
             drawBlock(daySchedule.pauseStart, daySchedule.pauseEnd);
             if (daySchedule.end < END_HOUR) drawBlock(daySchedule.end, END_HOUR);
 
-            mockAppointments.filter(a => a.kineId === kineId && a.dayIndex === dayIndex).forEach(appt => {
-                const el = document.createElement('div'); 
-                
-                // 1. GESTION DES CRÉNEAUX BLOQUÉS (Ce que tu avais vu)
-                if (appt.type === 'unavailable') {
-                    el.className = 'unavailable-block user-blocked-slot';
-                    el.style.top = `${getTopPosition(appt.timeStr)}px`; 
-                    el.style.height = `${appt.duration * PIXELS_PER_MINUTE}px`;
-                    el.innerHTML = `<span style="font-size: 0.7rem; font-weight: bold; color: #718096; padding: 4px; display: block; text-align: center; margin-top: ${appt.duration < 30 ? '-2px' : '0'};">Bloqué</span>`;
-                    
-                    el.addEventListener('click', (e) => { 
-                        e.stopPropagation(); 
-                        if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
-                            mockAppointments = mockAppointments.filter(a => a.id !== appt.id);
-                            saveData(); updatePatientSuggestions(); renderCalendar();
-                        }
-                    });
-                } 
-                // 2. GESTION DES VRAIS RENDEZ-VOUS PATIENTS (C'est ici qu'on a inversé)
-                else {
-                    el.className = 'appointment';
-                    el.style.top = `${getTopPosition(appt.timeStr)}px`; 
-                    el.style.height = `${appt.duration * PIXELS_PER_MINUTE}px`;
-                    el.style.backgroundColor = hexToRgba(config.color, 0.15); 
-                    el.style.borderLeftColor = config.color;
-                    el.style.color = config.color;
+            const dailyAppts = mockAppointments.filter(a => a.kineId === kineId && a.dayIndex === dayIndex);
+            const timeGroups = {};
+            dailyAppts.forEach(appt => {
+                if (!timeGroups[appt.timeStr]) timeGroups[appt.timeStr] = [];
+                timeGroups[appt.timeStr].push(appt);
+            });
 
-                    let tooltipContent = '';
-                    if (appt.isFirstVisit) tooltipContent += '🆕 PREMIER RDV\n';
-                    if (appt.isLastVisit) tooltipContent += '🛑 DERNIER RDV / ARRÊT\n';
-                    if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) tooltipContent += `⏳ ${appt.remainingSessions} séance(s) restante(s)\n`;
-                    if (appt.phones && appt.phones.length > 0) tooltipContent += `📞 ${appt.phones.join(' / ')}\n`;
-                    if (appt.note && appt.note.length > 0) tooltipContent += `📝 ${appt.note}`;
+            Object.values(timeGroups).forEach(group => {
+                const count = group.length;
+                group.forEach((appt, index) => {
+                    const el = document.createElement('div'); 
                     
-                    let noteHtml = '';
-                    if (tooltipContent !== '') {
-                        let icon = '📝';
-                        if (appt.isLastVisit) icon = '🛑';
-                        else if (appt.isFirstVisit) icon = '🆕';
-                        else if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) icon = '⏳';
+                    if (appt.type === 'unavailable') {
+                        el.className = 'unavailable-block user-blocked-slot';
+                        el.style.top = `${getTopPosition(appt.timeStr)}px`; 
+                        el.style.height = `${appt.duration * PIXELS_PER_MINUTE}px`;
+                        el.style.width = `calc(${100 / count}% - 8px)`;
+                        el.style.left = `calc(${index * (100 / count)}% + 4px)`;
                         
-                        noteHtml = `
-                            <div class="note-wrapper">
-                                <span class="note-icon">${icon}</span>
-                                <div class="note-tooltip">${tooltipContent.trim()}</div>
-                            </div>`;
+                        el.innerHTML = `<span style="font-size: 0.7rem; font-weight: bold; color: #718096; padding: 4px; display: block; text-align: center; margin-top: ${appt.duration < 30 ? '-2px' : '0'};">Bloqué</span>`;
+                        
+                        el.addEventListener('click', (e) => { 
+                            e.stopPropagation(); 
+                            if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
+                                mockAppointments = mockAppointments.filter(a => a.id !== appt.id);
+                                saveData(); updatePatientSuggestions(); renderCalendar();
+                            }
+                        });
+                    } 
+                    else {
+                        el.className = 'appointment';
+                        el.style.top = `${getTopPosition(appt.timeStr)}px`; 
+                        el.style.height = `${appt.duration * PIXELS_PER_MINUTE}px`;
+                        el.style.width = `calc(${100 / count}% - 8px)`;
+                        el.style.left = `calc(${index * (100 / count)}% + 4px)`;
+                        
+                        let apptColor = config.color;
+                        if (appt.apptType && apptTypesConfig[appt.apptType]) apptColor = apptTypesConfig[appt.apptType].color;
+                        if (appt.isImportant) apptColor = '#e53e3e';
+                        
+                        el.style.backgroundColor = hexToRgba(apptColor, 0.15); 
+                        el.style.borderLeftColor = apptColor;
+                        el.style.color = apptColor;
+
+                        let tooltipContent = `👤 ${appt.patient}\n`;
+                        if (appt.apptType && apptTypesConfig[appt.apptType]) tooltipContent += `🏷️ Type: ${apptTypesConfig[appt.apptType].label}\n`;
+                        if (appt.isImportant) tooltipContent += '⚠️ IMPORTANT\n';
+                        if (appt.isFirstVisit) tooltipContent += '🆕 PREMIER BILAN\n';
+                        if (appt.isLastVisit) tooltipContent += '🛑 DERNIER RDV / ARRÊT\n';
+                        if (appt.isCV) tooltipContent += '💳 CARTE VITALE À DEMANDER\n';
+                        if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) tooltipContent += `⏳ ${appt.remainingSessions} séance(s) restante(s)\n`;
+                        if (appt.phones && appt.phones.length > 0) tooltipContent += `📞 ${appt.phones.join(' / ')}\n`;
+                        if (appt.note && appt.note.length > 0) tooltipContent += `📝 ${appt.note}`;
+                        
+                        let iconHtml = '';
+                        if (appt.isImportant) iconHtml = '<span class="note-icon">⚠️</span>';
+                        else if (appt.isLastVisit) iconHtml = '<span class="note-icon">🛑</span>';
+                        else if (appt.isFirstVisit) iconHtml = '<span class="note-icon">🆕</span>';
+                        else if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) iconHtml = '<span class="note-icon">⏳</span>';
+                        else if (appt.note || (appt.phones && appt.phones.length > 0)) iconHtml = '<span class="note-icon">📝</span>';
+
+                        let cvIconHtml = appt.isCV ? '<span class="note-icon" style="margin-right: 2px;" title="Carte Vitale">💳</span>' : '';
+                        
+                        let noteWrapperHtml = '';
+                        if (iconHtml !== '' || cvIconHtml !== '') {
+                            noteWrapperHtml = `<div class="note-wrapper">${cvIconHtml}${iconHtml}</div>`;
+                        }
+
+                        let prefix = '';
+                        if (appt.isImportant) prefix = '⚠️ ';
+                        else if (appt.isLastVisit) prefix = '🛑 ';
+                        else if (appt.isFirstVisit) prefix = '🆕 ';
+
+                        el.innerHTML = `
+                            <div class="appt-text-content">
+                                <span class="appt-patient-name">${prefix}${appt.patient}</span>
+                                <span class="appt-time-details">${appt.timeStr} (${appt.duration}min)</span>
+                            </div>
+                            ${noteWrapperHtml}
+                            <div class="note-tooltip">${tooltipContent.trim()}</div>
+                        `;
+                        
+                        el.addEventListener('click', (e) => { 
+                            e.stopPropagation(); 
+                            openEditModal(appt);
+                        });
                     }
-
-                    let prefix = '';
-                    if (appt.isLastVisit) prefix = '🛑 ';
-                    else if (appt.isFirstVisit) prefix = '🆕 ';
-
-                    // INVERSION EFFECTUÉE ICI : Patient en haut, Heure en bas
-                    el.innerHTML = `
-                        <div class="appt-text-content">
-                            <span class="appt-patient-name">${prefix}${appt.patient}</span>
-                            <span class="appt-time-details">${appt.timeStr} (${appt.duration}min)</span>
-                        </div>
-                        ${noteHtml}
-                    `;
-                    
-                    el.addEventListener('click', (e) => { 
-                        e.stopPropagation(); 
-                        openEditModal(appt);
-                    });
-                }
-                
-                col.appendChild(el);
+                    col.appendChild(el);
+                });
             });
             return col;
         }
