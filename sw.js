@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kine-planning-v1';
+const CACHE_NAME = 'kine-planning-v2';
 const urlsToCache = [
   './',
   './index.html',
