@@ -448,37 +448,43 @@
                     <div class="control-group"><label>Fin journée</label><input type="time" id="adminEnd"></div>
                 </div>
                 
-                <h4 style="margin: 15px 0 10px 0; color: #4a5568;">Types de rendez-vous gérés</h4>
-                <div id="adminTypesContainer" style="display: flex; flex-direction: column; gap: 8px; background: #f7fafc; padding: 10px; border-radius: 4px; border: 1px solid #e2e8f0; max-height: 150px; overflow-y: auto;">
+                <h4 style="margin: 15px 0 10px 0; color: #a0aec0;">Types de rendez-vous gérés</h4>
+                <!-- CORRECTION : Suppression du fond blanc et de la bordure épaisse -->
+                <div id="adminTypesContainer" style="display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto; padding-right: 5px; margin-bottom: 10px;">
                     <!-- Les types seront générés ici -->
                 </div>
-                <button class="btn-cancel" onclick="addNewTypeRow()" style="width: 100%; margin-top: 5px; border-style: dashed;">+ Ajouter un nouveau type global</button>
+                <button class="btn-cancel" onclick="addNewTypeRow()" style="width: 100%; border-style: dashed;">+ Ajouter un nouveau type global</button>
 
-                <!-- MODULE DE CRÉATION DE COMPTE (CONNEXION) -->
-                <hr style="border-top: 1px solid #4a5568; margin: 25px 0 15px 0;">
-                <h4 style="color: #63b3ed; margin-bottom: 10px;">👤 Création d'Accès (Nouveau Kiné ou Remplaçant)</h4>
-                <p style="font-size: 0.75rem; color: #a0aec0; margin-top: -5px; margin-bottom: 10px;">Génère l'adresse email et le mot de passe de connexion pour ce cabinet.</p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-                    <div class="control-group">
-                        <label>Prénom / Nom</label>
-                        <input type="text" id="newAccName" placeholder="Ex: Marie">
+                <!-- CORRECTION : MODULE DÉROULANT (ACCORDÉON) -->
+                <details style="margin-top: 25px; border-top: 1px solid #4a5568; padding-top: 15px;">
+                    <summary style="color: #63b3ed; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
+                        👤 Création d'Accès (Nouveau Kiné ou Remplaçant)
+                    </summary>
+                    <div style="padding-top: 10px;">
+                        <p style="font-size: 0.75rem; color: #a0aec0; margin-top: 0; margin-bottom: 15px;">Génère l'adresse email et le mot de passe de connexion pour ce cabinet.</p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div class="control-group">
+                                <label>Prénom / Nom</label>
+                                <input type="text" id="newAccName" placeholder="Ex: Marie">
+                            </div>
+                            <div class="control-group">
+                                <label>Rôle du compte</label>
+                                <select id="newAccRole" onchange="document.getElementById('newAccKineLinkBox').style.display = this.value === 'remplacant' ? 'block' : 'none'">
+                                    <option value="kine">Nouveau Kiné (Créer planning)</option>
+                                    <option value="remplacant">Remplaçant(e)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group" id="newAccKineLinkBox" style="display: none; margin-bottom: 15px;">
+                            <label>Remplace quel Kiné ?</label>
+                            <select id="newAccKineLink"></select>
+                            <small style="color: #a0aec0; font-size: 0.7rem; margin-top: 4px; display: block;">Permet au remplaçant de se connecter sur l'agenda de ce titulaire.</small>
+                        </div>
+                        
+                        <button class="btn-save" onclick="createAccount()" style="background-color: #38a169; width: 100%;">Générer le compte et les accès</button>
                     </div>
-                    <div class="control-group">
-                        <label>Rôle du compte</label>
-                        <select id="newAccRole" onchange="document.getElementById('newAccKineLinkBox').style.display = this.value === 'remplacant' ? 'block' : 'none'">
-                            <option value="kine">Nouveau Kiné (Créer planning)</option>
-                            <option value="remplacant">Remplaçant(e)</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="control-group" id="newAccKineLinkBox" style="display: none; margin-bottom: 15px;">
-                    <label>Remplace quel Kiné ?</label>
-                    <select id="newAccKineLink"></select>
-                    <small style="color: #a0aec0; font-size: 0.7rem; margin-top: 4px; display: block;">Permet au remplaçant de se connecter sur l'agenda de ce titulaire.</small>
-                </div>
-                
-                <button class="btn-save" onclick="createAccount()" style="background-color: #38a169; width: 100%;">Générer le compte et les accès</button>
+                </details>
             </div>
             
             <!-- BOUTONS D'ACTION (AVEC SUPPRESSION) -->
