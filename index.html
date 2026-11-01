@@ -648,11 +648,20 @@
                 const currentYMD = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
                 const currentMins = now.getHours() * 60 + now.getMinutes();
 
+                // Tableau pour récupérer le nom du jour
+                const dayNamesFR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+
                 sortedAppts.forEach(a => {
                     const dParts = a.exactDate.split('-');
-                    const dateStr = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : a.exactDate;
-                    const kName = kinesConfig[a.kineId] ? kinesConfig[a.kineId].name : 'Kiné inconnu';
+                    let dateStr = a.exactDate;
                     
+                    // Ajout du jour de la semaine avant la date
+                    if (dParts.length === 3) {
+                        const dObj = new Date(a.exactDate);
+                        dateStr = `${dayNamesFR[dObj.getDay()]} ${dParts[2]}/${dParts[1]}/${dParts[0]}`;
+                    }
+                    
+                    const kName = kinesConfig[a.kineId] ? kinesConfig[a.kineId].name : 'Kiné inconnu';
                     const kColor = kinesConfig[a.kineId] ? kinesConfig[a.kineId].color : '#3182ce';
                     
                     let isPast = false;
@@ -670,7 +679,6 @@
                     if (a.status === 'cancelled_24h') statusBadge = '<span style="background: rgba(0,0,0,0.2); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">Annulé 24h</span>';
                     if (a.vegaPointed) statusBadge += '<span style="background: #c6f6d5; color: #276749; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">✅ Vega</span>';
 
-                    // Augmentation de l'opacité du fond pour un meilleur contraste avec le texte blanc
                     const itemBg = isPast ? hexToRgba(kColor, 0.5) : hexToRgba(kColor, 0.85);
                     const itemBorder = isPast ? hexToRgba(kColor, 0.3) : kColor;
                     const itemOp = isPast ? '0.75' : '1';
