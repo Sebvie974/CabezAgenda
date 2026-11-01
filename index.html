@@ -220,9 +220,16 @@
                     <datalist id="patientsList"></datalist>
                 </div>
                 
-                <div class="control-group">
-                    <label>Praticien</label>
-                    <select id="newApptKine" onchange="updateTypeSelectLabels(this.value)"></select>
+                <!-- NOUVEAU : Grille Praticien + Date visible -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Praticien</label>
+                        <select id="newApptKine" onchange="updateTypeSelectLabels(this.value)"></select>
+                    </div>
+                    <div class="control-group">
+                        <label>Date du RDV</label>
+                        <input type="date" id="newApptExactDate" onchange="updateDayIndexFromDate()">
+                    </div>
                 </div>
                 
                 <div class="options-box">
@@ -282,7 +289,8 @@
                     <label>Notes</label>
                     <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..."></textarea>
                 </div>
-                <input type="hidden" id="editApptId"><input type="hidden" id="newApptDay"><input type="hidden" id="newApptExactDate">
+                <!-- Le champ newApptExactDate n'est plus caché, il ne reste que l'ID de modification et le jour de semaine -->
+                <input type="hidden" id="editApptId"><input type="hidden" id="newApptDay">
             </div>
             <div class="modal-actions">
                 <button class="btn-cancel" id="cancelApptBtn" onclick="document.getElementById('addApptModal').style.display = 'none'">Annuler</button>
@@ -811,13 +819,23 @@
             container.appendChild(row);
         };
 
+        // NOUVEAU : Met à jour le jour caché (Lundi=0, Mardi=1) quand on change la date manuellement
+        window.updateDayIndexFromDate = function() {
+            const d = new Date(document.getElementById('newApptExactDate').value);
+            if (!isNaN(d)) {
+                let day = d.getDay();
+                day = (day === 0) ? 6 : day - 1; // 0 = Lundi, 6 = Dimanche
+                document.getElementById('newApptDay').value = day;
+            }
+        };
+
         window.openAddModal = function(kineId, dayIndex, timeStr, exactDate) {
             const kineSelect = document.getElementById('newApptKine');
             kineSelect.innerHTML = '';
             for(let k in kinesConfig) { kineSelect.innerHTML += `<option value="${k}">${kinesConfig[k].name}</option>`; }
             kineSelect.value = kineId;
             updateTypeSelectLabels(kineId); 
-            updateStatusSelectLabels(); // Charge les statuts du secrétariat
+            updateStatusSelectLabels(); 
             
             document.getElementById('editApptId').value = '';
             document.getElementById('newApptDay').value = dayIndex;
@@ -828,7 +846,7 @@
             document.getElementById('newPatientName').value = '';
             document.getElementById('newApptNotes').value = ''; 
             document.getElementById('newApptType').value = '';
-            document.getElementById('newApptStatus').value = ''; // Statut vierge par défaut
+            document.getElementById('newApptStatus').value = ''; 
             document.getElementById('newApptImportant').checked = false;
             document.getElementById('newApptFirstVisit').checked = false;
             document.getElementById('newApptLastVisit').checked = false;
@@ -840,7 +858,7 @@
             document.querySelectorAll('.recurrence-day').forEach(cb => cb.checked = (parseInt(cb.value) === dayIndex + 1));
             
             document.getElementById('phoneInputsContainer').innerHTML = `<div style="display: flex; gap: 5px;"><input type="tel" class="appt-phone-input" placeholder="06 00 00 00 00"><button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()">+</button></div>`;
-            document.getElementById('modalTitle').textContent = `Nouveau RDV (${timeStr})`;
+            document.getElementById('modalTitle').textContent = `Nouveau Rendez-vous`;
             document.getElementById('addSameSlotBtn').style.display = 'none';
             document.getElementById('deleteApptBtn').style.display = 'none'; 
             document.getElementById('blockSlotBtn').style.display = 'inline-block'; 
@@ -867,7 +885,7 @@
             document.getElementById('newPatientName').value = appt.patient;
             document.getElementById('newApptNotes').value = appt.note || '';
             document.getElementById('newApptType').value = appt.apptType || '';
-            document.getElementById('newApptStatus').value = appt.status || ''; // Charge l'ancien statut
+            document.getElementById('newApptStatus').value = appt.status || ''; 
             document.getElementById('newApptImportant').checked = appt.isImportant || false;
             document.getElementById('newApptFirstVisit').checked = appt.isFirstVisit || false;
             document.getElementById('newApptLastVisit').checked = appt.isLastVisit || false;
@@ -887,7 +905,7 @@
                 container.innerHTML = `<div style="display: flex; gap: 5px;"><input type="tel" class="appt-phone-input"><button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()">+</button></div>`;
             }
             
-            document.getElementById('modalTitle').textContent = `Modifier RDV (${appt.timeStr})`;
+            document.getElementById('modalTitle').textContent = `Modifier Rendez-vous`;
             document.getElementById('addSameSlotBtn').style.display = 'inline-block'; 
             document.getElementById('deleteApptBtn').style.display = 'inline-block'; 
             document.getElementById('blockSlotBtn').style.display = 'none'; 
