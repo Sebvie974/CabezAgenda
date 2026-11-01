@@ -376,6 +376,33 @@
                 </div>
                 <input type="hidden" id="editApptId"><input type="hidden" id="newApptDay">
             </div>
+
+            <!-- NOUVEAU : GESTION DES ACCÈS / CRÉATION DE COMPTE -->
+                <hr style="border-top: 1px solid #4a5568; margin: 25px 0 15px 0;">
+                <h4 style="color: #63b3ed; margin-bottom: 10px;">👤 Création d'Accès (Kiné / Remplaçant)</h4>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div class="control-group">
+                        <label>Prénom / Nom</label>
+                        <input type="text" id="newAccName" placeholder="Ex: Marie">
+                    </div>
+                    <div class="control-group">
+                        <label>Rôle du compte</label>
+                        <select id="newAccRole" onchange="document.getElementById('newAccKineLinkBox').style.display = this.value === 'remplacant' ? 'block' : 'none'">
+                            <option value="kine">Titulaire / Collaborateur</option>
+                            <option value="remplacant">Remplaçant(e)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="control-group" id="newAccKineLinkBox" style="display: none; margin-bottom: 15px;">
+                    <label>Remplace quel Kiné ?</label>
+                    <select id="newAccKineLink"></select>
+                    <small style="color: #a0aec0; font-size: 0.7rem; margin-top: 4px; display: block;">Le remplaçant aura accès au planning de ce titulaire.</small>
+                </div>
+                
+                <button class="btn-save" onclick="createAccount()" style="background-color: #38a169; width: 100%;">Générer le compte et les accès</button>
+
             <div class="modal-actions">
                 <button class="btn-cancel" id="cancelApptBtn" onclick="document.getElementById('addApptModal').style.display = 'none'">Annuler</button>
                 <button class="btn-cancel" id="deleteApptBtn" style="border-color: #e53e3e; color: #e53e3e; display: none;" onclick="deleteAppointment()">Supprimer</button>
@@ -810,7 +837,19 @@
             dateSelect.addEventListener('change', renderCalendar);
             adminKineSelect.addEventListener('change', (e) => loadAdminForm(e.target.value));
             
-            document.getElementById('openAdminBtn').addEventListener('click', () => { loadAdminForm(adminKineSelect.value || Object.keys(kinesConfig)[0]); adminModal.style.display = 'flex'; });
+            document.getElementById('openAdminBtn').addEventListener('click', () => { 
+                loadAdminForm(adminKineSelect.value || Object.keys(kinesConfig)[0]); 
+                
+                // Remplir le menu déroulant pour affecter un remplaçant
+                const linkSelect = document.getElementById('newAccKineLink');
+                if(linkSelect) {
+                    linkSelect.innerHTML = '';
+                    for(let k in kinesConfig) {
+                        linkSelect.innerHTML += `<option value="${k}">${kinesConfig[k].name}</option>`;
+                    }
+                }
+                adminModal.style.display = 'flex'; 
+            });
             document.getElementById('closeAdminBtn').addEventListener('click', () => adminModal.style.display = 'none');
             document.getElementById('saveKineBtn').addEventListener('click', saveKineConfiguration);
             document.getElementById('addKineBtn').addEventListener('click', createNewKine);
@@ -1164,6 +1203,58 @@
                 patient: 'Indisponible', type: 'unavailable' 
             });
             saveData(); document.getElementById('addApptModal').style.display = 'none'; renderCalendar();
+        };
+
+        window.createAccount = async function() {
+            const name = document.getElementById('newAccName').value.trim();
+            const role = document.getElementById('newAccRole').value;
+            const linkedKine = document.getElementById('newAccKineLink').value;
+
+            if(!name) return alert("Veuillez saisir un nom.");
+
+            // Création d'un identifiant propre (sans accents ni majuscules)
+            const cleanId = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
+            const email = `${cleanId}@cabinet.fr`;
+            
+            // Génération d'un mot de passe sécurisé et unique
+            const password = `Kine${Math.floor(1000 + Math.random() * 9000)}!`;
+
+            // ASTUCE : On crée un client temporaire "fantôme" pour ne pas déconnecter l'Admin
+            const tempClient = window.supabase.createClient(supabaseUrl, supabaseKey, {
+                auth: { persistSession: false, autoRefreshToken: false }
+            });
+
+            // Inscription du compte
+            const { data, error } = await tempClient.auth.signUp({ email: email, password: password });
+
+            if(error) return alert("Erreur lors de la création : " + error.message);
+
+            let finalKineId = cleanId;
+
+            // Si c'est un nouveau titulaire, on l'ajoute directement au planning
+            if (role === 'kine') {
+                if (!kinesConfig[cleanId]) {
+                    kinesConfig[cleanId] = {
+                        name: name, slotDuration: 30, color: '#' + Math.floor(Math.random()*16777215).toString(16),
+                        start: 8, end: 18, pauseStart: 12, pauseEnd: 13, allowedTypes: Object.keys(apptTypesConfig), schedule: {}
+                    };
+                    await saveData();
+                    updateKineSelects();
+                    renderCalendar();
+                }
+            } else {
+                // Si c'est un remplaçant, on le lie au planning du titulaire choisi
+                finalKineId = linkedKine;
+            }
+
+            // MAJ du rôle dans la base de données via le compte Admin
+            await supabaseClient.from('profiles').update({
+                role: role,
+                kine_id: finalKineId
+            }).eq('id', data.user.id);
+
+            alert(`✅ COMPTE CRÉÉ AVEC SUCCÈS !\n\nUtilisateur : ${name}\nEmail : ${email}\nMot de passe : ${password}\n\nVeuillez noter ces accès et les transmettre à la personne.`);
+            document.getElementById('newAccName').value = '';
         };
 
         window.saveNewAppointment = function() {
