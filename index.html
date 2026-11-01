@@ -433,11 +433,40 @@
             }
         }
 
-        function saveData() {
-            localStorage.setItem('kinesConfig', JSON.stringify(kinesConfig));
-            localStorage.setItem('mockAppointments', JSON.stringify(mockAppointments));
-            localStorage.setItem('apptTypesConfig', JSON.stringify(apptTypesConfig));
-            localStorage.setItem('statusConfig', JSON.stringify(statusConfig));
+        // --- SAUVEGARDE ASYNCHRONE VERS SUPABASE ---
+        async function saveData() {
+            // 1. Sauvegarde des configurations (Upsert)
+            await supabaseClient.from('app_config').upsert([
+                { key: 'kinesConfig', data: kinesConfig },
+                { key: 'apptTypesConfig', data: apptTypesConfig },
+                { key: 'statusConfig', data: statusConfig }
+            ]);
+
+            // 2. Sauvegarde des Rendez-vous (Conversion du JS vers le format SQL)
+            if (mockAppointments.length > 0) {
+                const apptsToSave = mockAppointments.map(a => ({
+                    id: a.id,
+                    kine_id: a.kineId,
+                    day_index: a.dayIndex,
+                    exact_date: a.exactDate,
+                    time_str: a.timeStr,
+                    duration: a.duration,
+                    patient: a.patient,
+                    note: a.note,
+                    appt_type: a.apptType,
+                    status: a.status,
+                    is_important: a.isImportant || false,
+                    is_first_visit: a.isFirstVisit || false,
+                    is_last_visit: a.isLastVisit || false,
+                    is_cv: a.isCV || false,
+                    remaining_sessions: a.remainingSessions || null,
+                    phones: a.phones || [],
+                    vega_pointed: a.vegaPointed || false
+                }));
+                
+                // Upsert permet de créer les nouveaux RDV et modifier les existants d'un coup
+                await supabaseClient.from('appointments').upsert(apptsToSave);
+            }
         }
 
         function updateStatusSelectLabels() {
@@ -851,11 +880,17 @@
             setTimeout(() => openAddModal(kineId, dayIndex, timeStr, exactDate), 50);
         };
 
-        window.deleteAppointment = function() {
+        window.deleteAppointment = async function() {
             const id = parseInt(document.getElementById('editApptId').value);
             if(confirm("Confirmer la suppression de ce rendez-vous ?")) {
+                // Suppression directe dans la base de données Supabase
+                await supabaseClient.from('appointments').delete().eq('id', id);
+                
+                // Mise à jour de l'affichage local
                 mockAppointments = mockAppointments.filter(a => a.id !== id);
-                saveData(); updatePatientSuggestions(); document.getElementById('addApptModal').style.display = 'none'; renderCalendar();
+                updatePatientSuggestions(); 
+                document.getElementById('addApptModal').style.display = 'none'; 
+                renderCalendar();
             }
         };
 
@@ -947,8 +982,6 @@
                 }
             }
 
-            // NOUVEAU : Synchronisation globale du numéro de téléphone !
-            // Met à jour tous les anciens et futurs RDV de ce patient avec le numéro que tu viens de valider.
             if (patientNameStr !== 'Indisponible' && patientNameStr !== 'Patient') {
                 mockAppointments.forEach(a => {
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
@@ -1061,7 +1094,6 @@
             col.style.backgroundSize = `100% ${gapPx}px`;
             col.style.backgroundImage = `linear-gradient(to bottom, transparent ${gapPx - 1}px, #e2e8f0 ${gapPx - 1}px, #e2e8f0 ${gapPx}px)`;
 
-            // --- CALCUL DE L'HEURE ACTUELLE POUR GRISER LE PASSÉ ---
             const now = new Date();
             const currentYMD = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
             const currentMins = now.getHours() * 60 + now.getMinutes();
@@ -1134,9 +1166,11 @@
                         
                         el.innerHTML = `<span style="font-size: 0.7rem; font-weight: bold; color: #718096; padding: 4px; display: block; text-align: center; margin-top: ${appt.duration < 30 ? '-2px' : '0'}; pointer-events: none;">Bloqué</span>`;
                         
-                        el.addEventListener('click', (e) => { 
+                        // CORRECTION ICI : Supression en base de données au déblocage
+                        el.addEventListener('click', async (e) => { 
                             e.stopPropagation(); 
                             if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
+                                await supabaseClient.from('appointments').delete().eq('id', appt.id);
                                 mockAppointments = mockAppointments.filter(a => a.id !== appt.id);
                                 saveData(); updatePatientSuggestions(); renderCalendar();
                             }
@@ -1146,13 +1180,12 @@
                         el.className = 'appointment';
                         if (appt.vegaPointed) el.classList.add('is-pointed');
 
-                        // --- VÉRIFICATION SI LE RDV EST DANS LE PASSÉ ---
                         let isPast = false;
                         if (exactDate < currentYMD) {
                             isPast = true;
                         } else if (exactDate === currentYMD) {
                             const [h, m] = appt.timeStr.split(':').map(Number);
-                            const apptEndMins = (h * 60) + m + appt.duration; // L'heure de FIN du rdv
+                            const apptEndMins = (h * 60) + m + appt.duration;
                             if (currentMins >= apptEndMins) isPast = true;
                         }
                         
@@ -1196,9 +1229,8 @@
                         
                         let displayPatientName = appt.patient;
                         let textDeco = 'none';
-                        let boxOpacity = isPast ? '0.45' : '1'; // Gris par défaut si passé
+                        let boxOpacity = isPast ? '0.45' : '1';
 
-                        // Application des règles visuelles pour les annulations
                         if (appt.status) {
                             if (appt.status === 'no_show') {
                                 displayPatientName = `(${appt.patient})`;
@@ -1212,7 +1244,6 @@
                             }
                         }
 
-                        // Appliquer l'opacité et un filtre gris-bleu pour les RDV passés
                         el.style.opacity = boxOpacity;
                         if (isPast) el.style.filter = 'grayscale(60%)';
 
