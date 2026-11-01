@@ -1235,9 +1235,15 @@
         };
 
         window.createAccount = async function() {
-            const name = document.getElementById('newAccName').value.trim();
-            const roleAction = document.getElementById('newAccRole').value;
-            const linkedKine = document.getElementById('newAccKineLink').value;
+            // CORRECTION : On cible précisément les champs à l'intérieur du menu déroulant (<details>) 
+            // pour ignorer les anciens blocs HTML en double qui renvoyaient une valeur vide.
+            const nameEl = document.querySelector('details #newAccName') || document.getElementById('newAccName');
+            const roleEl = document.querySelector('details #newAccRole') || document.getElementById('newAccRole');
+            const linkEl = document.querySelector('details #newAccKineLink') || document.getElementById('newAccKineLink');
+
+            const name = nameEl ? nameEl.value.trim() : '';
+            const roleAction = roleEl ? roleEl.value : 'new_kine';
+            const linkedKine = linkEl ? linkEl.value : '';
 
             if(!name) return alert("Veuillez saisir un nom.");
 
@@ -1255,7 +1261,6 @@
             let finalKineId = cleanId;
             let finalRole = 'kine';
 
-            // GESTION DES 3 CAS :
             if (roleAction === 'new_kine') {
                 if (!kinesConfig[cleanId]) {
                     kinesConfig[cleanId] = {
@@ -1267,21 +1272,20 @@
                     renderCalendar();
                 }
             } else if (roleAction === 'existing_kine') {
-                finalKineId = linkedKine; // On récupère l'identifiant du kiné existant
+                finalKineId = linkedKine; 
                 finalRole = 'kine';
             } else if (roleAction === 'remplacant') {
-                finalKineId = linkedKine; // Le remplaçant pointe vers le kiné existant
+                finalKineId = linkedKine; 
                 finalRole = 'remplacant';
             }
 
-            // MAJ dans la base de données via le compte Admin
             await supabaseClient.from('profiles').update({
                 role: finalRole,
                 kine_id: finalKineId
             }).eq('id', data.user.id);
 
             alert(`✅ COMPTE CRÉÉ AVEC SUCCÈS !\n\nUtilisateur : ${name}\nEmail : ${email}\nMot de passe : ${password}\n\nTransmettez ces accès au praticien pour qu'il puisse se connecter.`);
-            document.getElementById('newAccName').value = '';
+            if(nameEl) nameEl.value = '';
         };
 
         window.deleteKine = async function() {
