@@ -431,41 +431,62 @@
     </div>
 
     <!-- MODALE : GESTION DES KINÉS -->
-    <div class="modal-overlay" id="adminModal">
-        <div class="modal-content" style="width: 400px;">
-            <div style="margin-bottom: 15px;"><h3 style="margin-bottom: 0;">⚙️ Config globale Praticiens</h3></div>
+    <div class="modal-overlay" id="adminModal" style="display: none;">
+        <div class="modal-content" style="width: 500px; max-height: 90vh; overflow-y: auto;">
+            <h3 style="margin-bottom: 15px;">Configuration & Accès</h3>
             <div class="modal-body">
-                <div class="control-group"><label>Praticien</label><select id="adminKineSelect"></select></div>
-                <div class="control-group"><label>Nom</label><input type="text" id="adminName"></div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div class="control-group"><label>Arrivée</label><input type="time" id="adminStart"></div>
-                    <div class="control-group"><label>Départ</label><input type="time" id="adminEnd"></div>
-                    <div class="control-group"><label>Créneau</label><select id="adminSlot"><option value="20">20 min</option><option value="30">30 min</option></select></div>
-                    <div class="control-group"><label>Couleur</label><input type="color" id="adminColor" style="padding: 2px;"></div>
-                </div>
-
-                <hr style="border-color: #4a5568; margin: 10px 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <label style="color: #63b3ed; margin: 0;">Types de RDV (Cocher pour lier au kiné)</label>
-                    <button class="btn-cancel" onclick="addNewTypeRow()" style="padding: 2px 8px; font-size: 0.75rem; border-color: #3182ce; color: #3182ce;">+ Ajouter</button>
+                <div class="control-group">
+                    <label>Sélectionner un profil à modifier</label>
+                    <select id="adminKineSelect"></select>
                 </div>
                 
-                <!-- Zone Dynamique des Types -->
-                <div id="adminTypesContainer" style="display: flex; flex-direction: column; gap: 8px; max-height: 160px; overflow-y: auto; padding-right: 5px;"></div>
-
-                <hr style="border-color: #4a5568; margin: 10px 0;">
-                <label style="color: #63b3ed;">Sauvegarde des données</label>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-cancel" onclick="exportData()" style="flex: 1; border-color: #38a169; color: #38a169;">💾 Exporter</button>
-                    <button class="btn-cancel" onclick="document.getElementById('importFile').click()" style="flex: 1; border-color: #d69e2e; color: #d69e2e;">📂 Importer</button>
-                    <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group"><label>Nom d'affichage</label><input type="text" id="adminName"></div>
+                    <div class="control-group"><label>Couleur</label><input type="color" id="adminColor" style="width: 100%; height: 35px;"></div>
+                    <div class="control-group"><label>Durée créneau (min)</label><input type="number" id="adminSlot" step="5"></div>
+                    <div class="control-group"><label>Début journée</label><input type="time" id="adminStart"></div>
+                    <div class="control-group"><label>Fin journée</label><input type="time" id="adminEnd"></div>
                 </div>
+                
+                <h4 style="margin: 15px 0 10px 0; color: #4a5568;">Types de rendez-vous gérés</h4>
+                <div id="adminTypesContainer" style="display: flex; flex-direction: column; gap: 8px; background: #f7fafc; padding: 10px; border-radius: 4px; border: 1px solid #e2e8f0; max-height: 150px; overflow-y: auto;">
+                    <!-- Les types seront générés ici -->
+                </div>
+                <button class="btn-cancel" onclick="addNewTypeRow()" style="width: 100%; margin-top: 5px; border-style: dashed;">+ Ajouter un nouveau type global</button>
+
+                <!-- MODULE DE CRÉATION DE COMPTE (CONNEXION) -->
+                <hr style="border-top: 1px solid #4a5568; margin: 25px 0 15px 0;">
+                <h4 style="color: #63b3ed; margin-bottom: 10px;">👤 Création d'Accès (Nouveau Kiné ou Remplaçant)</h4>
+                <p style="font-size: 0.75rem; color: #a0aec0; margin-top: -5px; margin-bottom: 10px;">Génère l'adresse email et le mot de passe de connexion pour ce cabinet.</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div class="control-group">
+                        <label>Prénom / Nom</label>
+                        <input type="text" id="newAccName" placeholder="Ex: Marie">
+                    </div>
+                    <div class="control-group">
+                        <label>Rôle du compte</label>
+                        <select id="newAccRole" onchange="document.getElementById('newAccKineLinkBox').style.display = this.value === 'remplacant' ? 'block' : 'none'">
+                            <option value="kine">Nouveau Kiné (Créer planning)</option>
+                            <option value="remplacant">Remplaçant(e)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="control-group" id="newAccKineLinkBox" style="display: none; margin-bottom: 15px;">
+                    <label>Remplace quel Kiné ?</label>
+                    <select id="newAccKineLink"></select>
+                    <small style="color: #a0aec0; font-size: 0.7rem; margin-top: 4px; display: block;">Permet au remplaçant de se connecter sur l'agenda de ce titulaire.</small>
+                </div>
+                
+                <button class="btn-save" onclick="createAccount()" style="background-color: #38a169; width: 100%;">Générer le compte et les accès</button>
             </div>
-            <div class="modal-actions" style="justify-content: space-between;">
-                <button class="btn-cancel" id="addKineBtn" style="border-color: #319795; color: #319795;">+ Nouveau Kiné</button>
-                <div>
+            
+            <!-- BOUTONS D'ACTION (AVEC SUPPRESSION) -->
+            <div class="modal-actions" style="margin-top: 20px; justify-content: space-between;">
+                <button class="btn-cancel" id="deleteKineBtn" style="border-color: #e53e3e; color: #e53e3e;" onclick="deleteKine()">Supprimer ce kiné</button>
+                <div style="display: flex; gap: 10px;">
                     <button class="btn-cancel" id="closeAdminBtn">Fermer</button>
-                    <button class="btn-save" id="saveKineBtn">Appliquer</button>
+                    <button class="btn-save" id="saveKineBtn">Enregistrer</button>
                 </div>
             </div>
         </div>
@@ -1255,6 +1276,26 @@
 
             alert(`✅ COMPTE CRÉÉ AVEC SUCCÈS !\n\nUtilisateur : ${name}\nEmail : ${email}\nMot de passe : ${password}\n\nVeuillez noter ces accès et les transmettre à la personne.`);
             document.getElementById('newAccName').value = '';
+        };
+
+        window.deleteKine = async function() {
+            const kId = document.getElementById('adminKineSelect').value;
+            const kName = kinesConfig[kId].name;
+            
+            // Sécurité : on empêche de supprimer s'il ne reste qu'un seul kiné
+            if (Object.keys(kinesConfig).length <= 1) {
+                alert("Impossible de supprimer le dernier kiné du cabinet.");
+                return;
+            }
+
+            if(confirm(`⚠️ ATTENTION : Voulez-vous vraiment supprimer définitivement le planning de ${kName} ?\n\nSi vous validez, sa colonne disparaîtra du calendrier pour tout le monde.`)) {
+                delete kinesConfig[kId];
+                await saveData();
+                updateKineSelects();
+                practitionerFilter.value = 'all';
+                renderCalendar();
+                document.getElementById('adminModal').style.display = 'none';
+            }
         };
 
         window.saveNewAppointment = function() {
