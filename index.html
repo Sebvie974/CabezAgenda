@@ -1209,7 +1209,6 @@
                         
                         el.innerHTML = `<span style="font-size: 0.7rem; font-weight: bold; color: #718096; padding: 4px; display: block; text-align: center; margin-top: ${appt.duration < 30 ? '-2px' : '0'}; pointer-events: none;">Bloqué</span>`;
                         
-                        // CORRECTION ICI : Supression en base de données au déblocage
                         el.addEventListener('click', async (e) => { 
                             e.stopPropagation(); 
                             if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
@@ -1261,7 +1260,9 @@
                         if (appt.isImportant) iconHtml += '<span class="note-icon">⚠️</span>';
                         if (appt.isLastVisit) iconHtml += '<span class="note-icon">🛑</span>';
                         if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) iconHtml += '<span class="note-icon">⏳</span>';
-                        if (appt.note || (appt.phones && appt.phones.length > 0)) iconHtml += '<span class="note-icon">📝</span>';
+                        
+                        // CORRECTION : L'icône des notes n'apparaît que s'il y a du texte dans la note
+                        if (appt.note && appt.note.trim().length > 0) iconHtml += '<span class="note-icon">📝</span>';
 
                         let cvIconHtml = appt.isCV ? '<span class="note-icon" style="background-color: #38a169; color: white; padding: 1px 4px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; border: 1px solid #276749;">CV</span>' : '';
                         let noteWrapperHtml = (iconHtml !== '' || cvIconHtml !== '') ? `<div class="note-wrapper">${cvIconHtml}${iconHtml}</div>` : '';
