@@ -389,13 +389,13 @@
         // --- CONFIGURATION & SUPABASE ---
         const supabaseUrl = 'https://arqjpikvihnduggbwhxz.supabase.co'; // À RENSEIGNER
         const supabaseKey = 'sb_publishable_0a1_NQj3D8vpRart3Qb7Fg_-WoBkBDa'; // À RENSEIGNER
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
         const START_HOUR = 7, END_HOUR = 20, PIXELS_PER_MINUTE = 2;
         const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE; 
         const DAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
 
-        // On initialise les variables à vide, elles seront remplies par Supabase
+        // On initialise les variables à vide
         let kinesConfig = {};
         let mockAppointments = [];
         let apptTypesConfig = {};
@@ -404,7 +404,10 @@
         // --- CHARGEMENT ASYNCHRONE BDD ---
         async function loadDataFromSupabase() {
             try {
-                const { data: configData } = await supabase.from('app_config').select('*');
+                // On utilise supabaseClient ici aussi
+                const { data: configData, error: configError } = await supabaseClient.from('app_config').select('*');
+                if (configError) console.error("Erreur config:", configError);
+                
                 if (configData && configData.length > 0) {
                     configData.forEach(row => {
                         if (row.key === 'kinesConfig') kinesConfig = row.data;
@@ -413,7 +416,9 @@
                     });
                 }
 
-                const { data: apptData } = await supabase.from('appointments').select('*');
+                const { data: apptData, error: apptError } = await supabaseClient.from('appointments').select('*');
+                if (apptError) console.error("Erreur RDV:", apptError);
+                
                 if (apptData) {
                     mockAppointments = apptData.map(row => ({
                         id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
@@ -426,7 +431,7 @@
             } catch (error) {
                 console.error("Erreur de chargement Supabase:", error);
             }
-        };
+        }
 
         function saveData() {
             localStorage.setItem('kinesConfig', JSON.stringify(kinesConfig));
