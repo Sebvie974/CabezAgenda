@@ -670,6 +670,16 @@
         }
 
         window.addNewTypeRow = function() {
+            // CORRECTION : On mémorise ce qui est tapé à l'écran AVANT d'ajouter la nouvelle ligne
+            const rows = document.querySelectorAll('#adminTypesContainer .type-row');
+            rows.forEach(row => {
+                const key = row.getAttribute('data-key');
+                if(apptTypesConfig[key]) {
+                    apptTypesConfig[key].label = row.querySelector('.type-label').value;
+                    apptTypesConfig[key].color = row.querySelector('.type-color').value;
+                }
+            });
+
             const newKey = 't' + Date.now();
             apptTypesConfig[newKey] = { label: 'Nouveau Type', color: '#cbd5e0' };
             const kId = document.getElementById('adminKineSelect').value;
@@ -690,7 +700,7 @@
             }
         };
 
-        function loadAdminForm(kineId) {
+        window.loadAdminForm = function(kineId) {
             if(!kinesConfig[kineId]) return;
             const config = kinesConfig[kineId];
             document.getElementById('adminName').value = config.name;
@@ -701,8 +711,11 @@
             renderAdminTypes(kineId);
         }
 
-        function saveKineConfiguration() {
-            const kId = adminKineSelect.value, config = kinesConfig[kId];
+        // CORRECTION : Fonction asynchrone (async) et attente de Supabase (await saveData())
+        async function saveKineConfiguration() {
+            const kId = adminKineSelect.value;
+            const config = kinesConfig[kId];
+            
             config.name = document.getElementById('adminName').value;
             config.slotDuration = parseInt(document.getElementById('adminSlot').value);
             config.start = timeToFloat(document.getElementById('adminStart').value);
@@ -722,13 +735,21 @@
             });
             config.allowedTypes = allowed;
             
-            saveData(); updateKineSelects(); practitionerFilter.value = kId; renderCalendar(); adminModal.style.display = 'none';
+            await saveData(); 
+            
+            updateKineSelects(); 
+            practitionerFilter.value = kId; 
+            renderCalendar(); 
+            adminModal.style.display = 'none';
         }
 
-        function createNewKine() {
+        async function createNewKine() {
             const newId = 'k' + Date.now(); 
             kinesConfig[newId] = { name: 'Nouveau', slotDuration: 30, color: '#e53e3e', start: 8, end: 18, pauseStart: 12, pauseEnd: 13, allowedTypes: Object.keys(apptTypesConfig), schedule: {} };
-            updateKineSelects(); adminKineSelect.value = newId; loadAdminForm(newId); saveData();
+            updateKineSelects(); 
+            adminKineSelect.value = newId; 
+            loadAdminForm(newId); 
+            await saveData();
         }
 
         // --- GESTION JOUR SPÉCIFIQUE ---
@@ -744,7 +765,7 @@
             dayConfigModal.style.display = 'flex';
         };
 
-        function saveDayConfiguration() {
+        async function saveDayConfiguration() {
             const kId = document.getElementById('dayModalKine').value;
             const dayIdx = parseInt(document.getElementById('dayModalDay').value);
             if(!kinesConfig[kId].schedule) kinesConfig[kId].schedule = {};
@@ -752,14 +773,18 @@
                 start: timeToFloat(document.getElementById('dayStart').value), end: timeToFloat(document.getElementById('dayEnd').value),
                 pauseStart: timeToFloat(document.getElementById('dayPauseStart').value), pauseEnd: timeToFloat(document.getElementById('dayPauseEnd').value)
             };
-            saveData(); dayConfigModal.style.display = 'none'; renderCalendar();
+            await saveData(); 
+            dayConfigModal.style.display = 'none'; 
+            renderCalendar();
         }
 
-        function resetDayConfiguration() {
+        async function resetDayConfiguration() {
             const kId = document.getElementById('dayModalKine').value;
             const dayIdx = parseInt(document.getElementById('dayModalDay').value);
             if(kinesConfig[kId].schedule) delete kinesConfig[kId].schedule[dayIdx];
-            saveData(); dayConfigModal.style.display = 'none'; renderCalendar();
+            await saveData(); 
+            dayConfigModal.style.display = 'none'; 
+            renderCalendar();
         }
 
         // --- GESTION RDV ---
