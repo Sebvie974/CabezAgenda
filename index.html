@@ -208,7 +208,7 @@
 
     <!-- MODALE : AJOUT / MODIFICATION RDV -->
     <div class="modal-overlay" id="addApptModal">
-        <div class="modal-content" style="width: 400px;">
+        <div class="modal-content" style="width: 400px; max-height: 95vh; overflow-y: auto;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 id="modalTitle">Nouveau Rendez-vous</h3>
                 <button class="btn-cancel" id="addSameSlotBtn" style="border-color: #3182ce; color: #3182ce; display: none; padding: 0 10px; font-weight: bold; font-size: 1.4rem; height: 30px; line-height: 1;" title="Ajouter un autre patient sur ce même créneau horaire" onclick="triggerAddSameSlot()">+</button>
@@ -220,7 +220,12 @@
                     <datalist id="patientsList"></datalist>
                 </div>
                 
-                <!-- NOUVEAU : Grille Praticien + Date visible -->
+                <!-- NOUVEAU : Historique des RDVs du patient (caché par défaut) -->
+                <div class="control-group" id="patientHistoryContainer" style="display: none; margin-top: -5px; margin-bottom: 10px; background: rgba(99, 179, 237, 0.1); border: 1px solid #63b3ed; padding: 8px; border-radius: 4px; max-height: 110px; overflow-y: auto; font-size: 0.75rem;">
+                    <strong style="color: #2b6cb0;">📅 RDV Programmés :</strong>
+                    <ul id="patientHistoryList" style="margin: 5px 0 0 20px; padding: 0; color: #2d3748;"></ul>
+                </div>
+                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="control-group">
                         <label>Praticien</label>
@@ -289,7 +294,6 @@
                     <label>Notes</label>
                     <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..."></textarea>
                 </div>
-                <!-- Le champ newApptExactDate n'est plus caché, il ne reste que l'ID de modification et le jour de semaine -->
                 <input type="hidden" id="editApptId"><input type="hidden" id="newApptDay">
             </div>
             <div class="modal-actions">
@@ -563,21 +567,39 @@
 
         // --- INITIALISATION ---
         // NOUVEAU : Fonction dédiée ultra-robuste pour récupérer les téléphones
-        window.fillPhonesForPatient = function(typedName) {
-            if (!typedName) return;
+        // NOUVEAU : Récupère Téléphones, Notes et Historique des RDVs
+        window.fillPatientData = function(typedName) {
+            const historyContainer = document.getElementById('patientHistoryContainer');
+            if (!typedName) {
+                if(historyContainer) historyContainer.style.display = 'none';
+                return;
+            }
             const searchName = typedName.trim().toLowerCase();
             let foundPhones = [];
+            let foundNote = '';
+            let historyHtml = '';
             
-            // On cherche le RDV le plus récent de ce patient avec un numéro enregistré
-            for (let i = mockAppointments.length - 1; i >= 0; i--) {
-                const apptName = mockAppointments[i].patient ? mockAppointments[i].patient.trim().toLowerCase() : '';
-                if (apptName === searchName && mockAppointments[i].phones && mockAppointments[i].phones.length > 0) {
-                    foundPhones = mockAppointments[i].phones;
-                    break;
-                }
+            const patientAppts = mockAppointments.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
+            
+            if (patientAppts.length > 0) {
+                // On récupère le dernier téléphone connu
+                const apptWithPhone = [...patientAppts].reverse().find(a => a.phones && a.phones.length > 0);
+                if (apptWithPhone) foundPhones = apptWithPhone.phones;
+
+                // On récupère la dernière note connue
+                const apptWithNote = [...patientAppts].reverse().find(a => a.note && a.note.trim() !== '');
+                if (apptWithNote) foundNote = apptWithNote.note;
+
+                // Construction de l'historique (trié par date et heure)
+                const sortedAppts = [...patientAppts].sort((a, b) => new Date(`${a.exactDate}T${a.timeStr}`) - new Date(`${b.exactDate}T${b.timeStr}`));
+                sortedAppts.forEach(a => {
+                    const dParts = a.exactDate.split('-');
+                    const dateStr = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : a.exactDate;
+                    const kName = kinesConfig[a.kineId] ? kinesConfig[a.kineId].name : '';
+                    historyHtml += `<li style="margin-bottom: 2px;">${dateStr} à <b>${a.timeStr}</b> <span style="opacity:0.7;">(${kName})</span></li>`;
+                });
             }
             
-            // Si on trouve des numéros, on met à jour la fenêtre
             if (foundPhones.length > 0) {
                 const container = document.getElementById('phoneInputsContainer');
                 container.innerHTML = '';
@@ -588,6 +610,19 @@
                     </div>`;
                 });
             }
+
+            // Remplit la note uniquement si le champ est actuellement vide
+            const noteEl = document.getElementById('newApptNotes');
+            if (foundNote && !noteEl.value) noteEl.value = foundNote;
+
+            // Affichage de l'historique
+            const historyList = document.getElementById('patientHistoryList');
+            if (historyHtml && historyContainer && historyList) {
+                historyList.innerHTML = historyHtml;
+                historyContainer.style.display = 'block';
+            } else if (historyContainer) {
+                historyContainer.style.display = 'none';
+            }
         };
 
         window.isSecretariatMode = false;
@@ -595,7 +630,6 @@
         async function init() {
             if(!dateSelect.value) dateSelect.value = new Date().toISOString().split('T')[0];
             
-            // On attend que les données Supabase soient téléchargées avant de construire l'agenda
             await loadDataFromSupabase(); 
             
             updateKineSelects(); updatePatientSuggestions();
@@ -626,9 +660,10 @@
                 }
             });
 
+            // Écoute des frappes pour lancer la nouvelle fonction fillPatientData
             const patientInput = document.getElementById('newPatientName');
-            patientInput.addEventListener('input', (e) => window.fillPhonesForPatient(e.target.value));
-            patientInput.addEventListener('change', (e) => window.fillPhonesForPatient(e.target.value));
+            patientInput.addEventListener('input', (e) => window.fillPatientData(e.target.value));
+            patientInput.addEventListener('change', (e) => window.fillPatientData(e.target.value));
 
             document.getElementById('saveDayBtn').addEventListener('click', saveDayConfiguration);
             document.getElementById('resetDayBtn').addEventListener('click', resetDayConfiguration);
@@ -864,6 +899,10 @@
             document.getElementById('blockSlotBtn').style.display = 'inline-block'; 
             document.getElementById('confirmApptBtn').textContent = 'Ajouter';
             
+            // Cache l'historique à l'ouverture d'un nouveau RDV vide
+            const histCont = document.getElementById('patientHistoryContainer');
+            if (histCont) histCont.style.display = 'none';
+            
             document.getElementById('addApptModal').style.display = 'flex';
             document.getElementById('newPatientName').focus();
         };
@@ -911,6 +950,9 @@
             document.getElementById('blockSlotBtn').style.display = 'none'; 
             document.getElementById('confirmApptBtn').textContent = 'Modifier';
             
+            // Appelle la fonction pour afficher l'historique et les notes si existantes
+            window.fillPatientData(appt.patient);
+            
             document.getElementById('addApptModal').style.display = 'flex';
         };
 
@@ -952,6 +994,7 @@
             const phonesArray = Array.from(phoneInputs).map(input => input.value.trim()).filter(val => val !== '');
             const editId = document.getElementById('editApptId').value;
             const remainingVal = document.getElementById('newApptRemaining').value;
+            const currentNote = document.getElementById('newApptNotes').value.trim();
             
             const recurrenceWeeks = parseInt(document.getElementById('newApptRecurrence').value) || 1;
             const selectedDays = Array.from(document.querySelectorAll('.recurrence-day:checked')).map(cb => parseInt(cb.value));
@@ -964,7 +1007,7 @@
                 timeStr: document.getElementById('newApptTime').value,
                 duration: parseInt(document.getElementById('newApptDuration').value),
                 patient: patientNameStr,
-                note: document.getElementById('newApptNotes').value.trim(),
+                note: currentNote,
                 apptType: document.getElementById('newApptType').value,
                 status: document.getElementById('newApptStatus').value,
                 isImportant: document.getElementById('newApptImportant').checked,
@@ -1025,10 +1068,12 @@
                 }
             }
 
+            // NOUVEAU : Synchronisation globale du numéro de téléphone ET des notes au patient !
             if (patientNameStr !== 'Indisponible' && patientNameStr !== 'Patient') {
                 mockAppointments.forEach(a => {
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
                         a.phones = [...phonesArray];
+                        a.note = currentNote;
                     }
                 });
             }
