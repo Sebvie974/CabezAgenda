@@ -6,6 +6,9 @@
     <title>Planning du Cabinet - Gestion Kinés</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2d3748">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <style>
         :root {
             --bg-app: #1a202c;        
@@ -546,6 +549,7 @@
             <div class="control-group" style="width: auto; min-width: 150px;"><label>Vue</label><select id="practitionerFilter"></select></div>
             <button class="btn-save" id="toggleSecretariatBtn" style="margin-top: 18px; background-color: #805ad5;">📠 Pointage</button>
             <button class="btn-save" id="openAdminBtn" style="margin-top: 18px; background-color: #4a5568;">⚙️ Config</button>
+            <button class="btn-save" onclick="document.getElementById('profileModal').style.display='flex'" style="margin-top: 18px; background-color: #3182ce;" title="Mon Profil">🔑</button>
             <button class="btn-cancel" onclick="logoutUser()" style="margin-top: 18px; border-color: #e53e3e; color: #e53e3e;" title="Se déconnecter">🚪</button>
     </header>
 
@@ -555,6 +559,28 @@
             <div class="calendar-grid" id="mainCalendarGrid">
                 <div class="time-axis" id="timeAxis"></div>
                 <div class="days-wrapper" id="daysWrapper"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE PROFIL / MOT DE PASSE -->
+    <div class="modal-overlay" id="profileModal" style="display: none;">
+        <div class="modal-content" style="width: 350px;">
+            <h3 style="margin-bottom: 15px;">Mon Compte</h3>
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: #4a5568; margin-bottom: 15px;">Modifier mon mot de passe de connexion :</p>
+                <div class="control-group">
+                    <label>Nouveau mot de passe</label>
+                    <input type="password" id="newProfilePwd" placeholder="Min. 6 caractères">
+                </div>
+                <div class="control-group" style="margin-bottom: 20px;">
+                    <label>Confirmer le mot de passe</label>
+                    <input type="password" id="confirmProfilePwd" placeholder="Confirmer">
+                </div>
+                <button class="btn-save" onclick="updateMyPassword()" style="width: 100%; background-color: #38a169;">Mettre à jour</button>
+            </div>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button class="btn-cancel" onclick="document.getElementById('profileModal').style.display='none'" style="width: 100%;">Fermer</button>
             </div>
         </div>
     </div>
@@ -1752,7 +1778,32 @@
             }
         }
 
+        window.updateMyPassword = async function() {
+            const pwd1 = document.getElementById('newProfilePwd').value;
+            const pwd2 = document.getElementById('confirmProfilePwd').value;
+
+            if (!pwd1 || pwd1.length < 6) return alert("Le mot de passe doit faire au moins 6 caractères.");
+            if (pwd1 !== pwd2) return alert("Les mots de passe ne correspondent pas.");
+
+            const { data, error } = await supabaseClient.auth.updateUser({ password: pwd1 });
+            
+            if (error) {
+                alert("Erreur : " + error.message);
+            } else {
+                alert("✅ Mot de passe mis à jour avec succès !");
+                document.getElementById('newProfilePwd').value = '';
+                document.getElementById('confirmProfilePwd').value = '';
+                document.getElementById('profileModal').style.display = 'none';
+            }
+        };
+
         window.onload = checkAuth;
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log('Erreur SW', err));
+            });
+        }
     </script>
 </body>
 </html>
