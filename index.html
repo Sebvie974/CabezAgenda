@@ -220,12 +220,6 @@
                     <datalist id="patientsList"></datalist>
                 </div>
                 
-                <!-- NOUVEAU : Historique des RDVs du patient (caché par défaut) -->
-                <div class="control-group" id="patientHistoryContainer" style="display: none; margin-top: -5px; margin-bottom: 10px; background: rgba(99, 179, 237, 0.1); border: 1px solid #63b3ed; padding: 8px; border-radius: 4px; max-height: 110px; overflow-y: auto; font-size: 0.75rem;">
-                    <strong style="color: #2b6cb0;">📅 RDV Programmés :</strong>
-                    <ul id="patientHistoryList" style="margin: 5px 0 0 20px; padding: 0; color: #2d3748;"></ul>
-                </div>
-                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="control-group">
                         <label>Praticien</label>
@@ -305,6 +299,24 @@
         </div>
     </div>
 
+    <!-- NOUVELLE MODALE : HISTORIQUE RECHERCHE GLOBALE -->
+    <div class="modal-overlay" id="patientHistoryGlobalModal" style="display: none;">
+        <div class="modal-content" style="width: 500px; max-height: 80vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 id="historyModalTitle">Rendez-vous de : </h3>
+                <button class="btn-cancel" onclick="document.getElementById('patientHistoryGlobalModal').style.display='none'" style="padding: 0 10px; font-weight: bold; border-color: #e53e3e; color: #e53e3e;">X</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; flex-grow: 1; margin-bottom: 10px;">
+                <ul id="globalPatientHistoryList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Les RDV s'afficheront ici -->
+                </ul>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-save" onclick="document.getElementById('patientHistoryGlobalModal').style.display='none'" style="width: 100%;">Fermer</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODALE : GESTION DES KINÉS -->
     <div class="modal-overlay" id="adminModal">
         <div class="modal-content" style="width: 400px;">
@@ -370,6 +382,7 @@
     </div>
 
     <!-- BARRE D'OUTILS -->
+    <!-- BARRE D'OUTILS -->
     <header class="toolbar">
         <div class="brand"><h1>Planning du Cabinet</h1></div>
         <div class="controls">
@@ -381,6 +394,14 @@
                     <button class="btn-cancel" id="nextDateBtn" style="padding: 0 10px;">&gt;</button>
                 </div>
             </div>
+            
+            <!-- NOUVEAU : Barre de recherche globale de patient -->
+            <div class="control-group" style="width: auto;">
+                <label>Rechercher un patient</label>
+                <input type="text" id="globalPatientSearch" list="globalPatientsList" placeholder="Ex: Jean Dupont" autocomplete="off" style="width: 180px;">
+                <datalist id="globalPatientsList"></datalist>
+            </div>
+
             <div class="control-group" style="width: auto; min-width: 150px;"><label>Vue</label><select id="practitionerFilter"></select></div>
             <button class="btn-save" id="toggleSecretariatBtn" style="margin-top: 18px; background-color: #805ad5;">📠 Pointage</button>
             <button class="btn-save" id="openAdminBtn" style="margin-top: 18px; background-color: #4a5568;">⚙️ Config</button>
@@ -555,73 +576,127 @@
         // --- AUTO-COMPLÉTION PATIENTS ---
         function updatePatientSuggestions() {
             const datalist = document.getElementById('patientsList');
-            datalist.innerHTML = ''; 
+            const globalDatalist = document.getElementById('globalPatientsList');
+            if(datalist) datalist.innerHTML = ''; 
+            if(globalDatalist) globalDatalist.innerHTML = '';
+
             const allNames = mockAppointments.map(appt => appt.patient).filter(name => name && name !== 'Indisponible' && name !== 'Patient');
             const uniqueNames = [...new Set(allNames)].sort();
             uniqueNames.forEach(name => {
                 const option = document.createElement('option');
                 option.value = name;
-                datalist.appendChild(option);
+                if(datalist) datalist.appendChild(option);
+                
+                if(globalDatalist) {
+                    const optGlobal = document.createElement('option');
+                    optGlobal.value = name;
+                    globalDatalist.appendChild(optGlobal);
+                }
             });
         }
 
-        // --- INITIALISATION ---
-        // NOUVEAU : Fonction dédiée ultra-robuste pour récupérer les téléphones
-        // NOUVEAU : Récupère Téléphones, Notes et Historique des RDVs
+        // --- GESTION DES RECHERCHES ET DONNÉES PATIENTS ---
         window.fillPatientData = function(typedName) {
-            const historyContainer = document.getElementById('patientHistoryContainer');
-            if (!typedName) {
-                if(historyContainer) historyContainer.style.display = 'none';
-                return;
-            }
+            if (!typedName) return;
             const searchName = typedName.trim().toLowerCase();
             let foundPhones = [];
             let foundNote = '';
-            let historyHtml = '';
             
             const patientAppts = mockAppointments.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
             
             if (patientAppts.length > 0) {
-                // On récupère le dernier téléphone connu
                 const apptWithPhone = [...patientAppts].reverse().find(a => a.phones && a.phones.length > 0);
                 if (apptWithPhone) foundPhones = apptWithPhone.phones;
 
-                // On récupère la dernière note connue
                 const apptWithNote = [...patientAppts].reverse().find(a => a.note && a.note.trim() !== '');
                 if (apptWithNote) foundNote = apptWithNote.note;
-
-                // Construction de l'historique (trié par date et heure)
-                const sortedAppts = [...patientAppts].sort((a, b) => new Date(`${a.exactDate}T${a.timeStr}`) - new Date(`${b.exactDate}T${b.timeStr}`));
-                sortedAppts.forEach(a => {
-                    const dParts = a.exactDate.split('-');
-                    const dateStr = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : a.exactDate;
-                    const kName = kinesConfig[a.kineId] ? kinesConfig[a.kineId].name : '';
-                    historyHtml += `<li style="margin-bottom: 2px;">${dateStr} à <b>${a.timeStr}</b> <span style="opacity:0.7;">(${kName})</span></li>`;
-                });
             }
             
             if (foundPhones.length > 0) {
                 const container = document.getElementById('phoneInputsContainer');
-                container.innerHTML = '';
-                foundPhones.forEach((phone, index) => {
-                    container.innerHTML += `<div style="display: flex; gap: 5px;">
-                        <input type="tel" class="appt-phone-input" value="${phone}">
-                        <button class="btn-cancel" style="padding: 0 10px; ${index !== 0 ? 'border-color: #e53e3e; color: #e53e3e;' : ''}" onclick="${index === 0 ? 'addPhoneField()' : 'this.parentElement.remove()'}">${index === 0 ? '+' : '-'}</button>
-                    </div>`;
-                });
+                if(container) {
+                    container.innerHTML = '';
+                    foundPhones.forEach((phone, index) => {
+                        container.innerHTML += `<div style="display: flex; gap: 5px;">
+                            <input type="tel" class="appt-phone-input" value="${phone}">
+                            <button class="btn-cancel" style="padding: 0 10px; ${index !== 0 ? 'border-color: #e53e3e; color: #e53e3e;' : ''}" onclick="${index === 0 ? 'addPhoneField()' : 'this.parentElement.remove()'}">${index === 0 ? '+' : '-'}</button>
+                        </div>`;
+                    });
+                }
             }
 
-            // Remplit la note uniquement si le champ est actuellement vide
             const noteEl = document.getElementById('newApptNotes');
-            if (foundNote && !noteEl.value) noteEl.value = foundNote;
+            if (noteEl && foundNote && !noteEl.value) noteEl.value = foundNote;
+        };
 
-            // Affichage de l'historique
-            const historyList = document.getElementById('patientHistoryList');
-            if (historyHtml && historyContainer && historyList) {
-                historyList.innerHTML = historyHtml;
-                historyContainer.style.display = 'block';
-            } else if (historyContainer) {
-                historyContainer.style.display = 'none';
+        window.openPatientHistoryGlobal = function(typedName) {
+            if(!typedName) return;
+            const searchName = typedName.trim().toLowerCase();
+            // On cherche tous les RDV de ce patient (tous les kinés confondus)
+            const patientAppts = mockAppointments.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
+            
+            const listEl = document.getElementById('globalPatientHistoryList');
+            if(!listEl) return;
+            listEl.innerHTML = '';
+            
+            document.getElementById('historyModalTitle').textContent = `Rendez-vous de : ${typedName.trim()}`;
+            
+            if(patientAppts.length === 0) {
+                listEl.innerHTML = '<li style="padding: 15px; text-align: center; color: #718096; background: #f7fafc; border-radius: 6px;">Aucun rendez-vous trouvé pour ce patient.</li>';
+            } else {
+                // Tri chronologique des RDV
+                const sortedAppts = [...patientAppts].sort((a, b) => new Date(`${a.exactDate}T${a.timeStr}`) - new Date(`${b.exactDate}T${b.timeStr}`));
+                const now = new Date();
+                const currentYMD = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                const currentMins = now.getHours() * 60 + now.getMinutes();
+
+                sortedAppts.forEach(a => {
+                    const dParts = a.exactDate.split('-');
+                    const dateStr = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : a.exactDate;
+                    const kName = kinesConfig[a.kineId] ? kinesConfig[a.kineId].name : 'Kiné inconnu';
+                    
+                    let isPast = false;
+                    if (a.exactDate < currentYMD) {
+                        isPast = true;
+                    } else if (a.exactDate === currentYMD) {
+                        const [h, m] = a.timeStr.split(':').map(Number);
+                        const apptEndMins = (h * 60) + m + a.duration;
+                        if (currentMins >= apptEndMins) isPast = true;
+                    }
+
+                    let statusBadge = '';
+                    if (a.status === 'no_show') statusBadge = '<span style="background: #e2e8f0; color: #4a5568; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">Pas venu</span>';
+                    if (a.status === 'cancelled_today') statusBadge = '<span style="background: #fed7d7; color: #c53030; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">Annulé</span>';
+                    if (a.status === 'cancelled_24h') statusBadge = '<span style="background: #e2e8f0; color: #718096; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">Annulé 24h</span>';
+                    if (a.vegaPointed) statusBadge += '<span style="background: #c6f6d5; color: #276749; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">✅ Vega</span>';
+
+                    const itemBg = isPast ? '#f7fafc' : '#ebf8ff';
+                    const itemBorder = isPast ? '#e2e8f0' : '#90cdf4';
+                    const itemOp = isPast ? '0.7' : '1';
+
+                    listEl.innerHTML += `
+                        <li style="background: ${itemBg}; border: 1px solid ${itemBorder}; padding: 10px; border-radius: 6px; opacity: ${itemOp}; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: bold; color: #2d3748; margin-bottom: 4px; font-size: 0.9rem;">📅 ${dateStr} à ${a.timeStr} ${statusBadge}</div>
+                                <div style="font-size: 0.8rem; color: #4a5568;">👤 ${kName} | ⏳ ${a.duration} min</div>
+                            </div>
+                            <button class="btn-save" style="padding: 4px 10px; font-size: 0.75rem; min-width: auto; height: auto;" onclick="window.openEditModalFromHistory(${a.id})">Aller au RDV</button>
+                        </li>
+                    `;
+                });
+            }
+            
+            document.getElementById('patientHistoryGlobalModal').style.display = 'flex';
+        };
+
+        window.openEditModalFromHistory = function(apptId) {
+            document.getElementById('patientHistoryGlobalModal').style.display = 'none';
+            const appt = mockAppointments.find(a => a.id === apptId);
+            if(appt) {
+                // Change la date de fond pour sauter vers le jour du RDV
+                document.getElementById('dateSelect').value = appt.exactDate;
+                renderCalendar();
+                openEditModal(appt);
             }
         };
 
@@ -660,10 +735,18 @@
                 }
             });
 
-            // Écoute des frappes pour lancer la nouvelle fonction fillPatientData
             const patientInput = document.getElementById('newPatientName');
             patientInput.addEventListener('input', (e) => window.fillPatientData(e.target.value));
             patientInput.addEventListener('change', (e) => window.fillPatientData(e.target.value));
+
+            // NOUVEAU : Écouteur de l'input de recherche globale
+            const globalSearch = document.getElementById('globalPatientSearch');
+            if(globalSearch) {
+                globalSearch.addEventListener('change', (e) => {
+                    window.openPatientHistoryGlobal(e.target.value);
+                    e.target.value = ''; 
+                });
+            }
 
             document.getElementById('saveDayBtn').addEventListener('click', saveDayConfiguration);
             document.getElementById('resetDayBtn').addEventListener('click', resetDayConfiguration);
