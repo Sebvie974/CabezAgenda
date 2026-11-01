@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Planning du Cabinet - Gestion Kinés</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -201,6 +202,75 @@
             #practitionerFilter option[value="all"] { display: none; }
             .sub-header-labels { display: none; }
             .practitioners-subgrid { grid-template-columns: 1fr !important; }
+        }
+        /* --- ADAPTATION MOBILE (SMARTPHONES) --- */
+        @media (max-width: 768px) {
+            /* Barre d'outils empilée */
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                height: auto;
+                padding: 10px;
+                gap: 15px;
+            }
+            .toolbar .controls {
+                flex-direction: column;
+                width: 100%;
+                gap: 10px;
+            }
+            .toolbar .control-group {
+                width: 100% !important;
+                display: flex;
+                flex-direction: column;
+            }
+            .toolbar .control-group input, 
+            .toolbar .control-group select {
+                width: 100% !important;
+                box-sizing: border-box;
+            }
+            
+            /* Boutons d'en-tête (Pointage / Config) sur la même ligne */
+            .toolbar .controls > button {
+                margin-top: 0 !important;
+                width: 100%;
+            }
+            .toolbar .controls > div:last-of-type {
+                display: flex;
+                gap: 10px;
+                width: 100%;
+            }
+
+            /* Modales adaptées à 95% de l'écran */
+            .modal-content {
+                width: 95% !important;
+                padding: 15px;
+                margin-top: 10px;
+            }
+            
+            /* Formulaires empilés au lieu de 2 colonnes */
+            .modal-body > div[style*="grid-template-columns"] {
+                grid-template-columns: 1fr !important;
+            }
+            
+            /* Ajustement de la grille du calendrier */
+            .time-axis {
+                width: 45px;
+                font-size: 0.75rem;
+            }
+            .day-column {
+                min-width: 100%;
+            }
+            
+            /* Réduction des textes dans les blocs RDV */
+            .appt-patient-name {
+                font-size: 0.75rem;
+            }
+            .appointment {
+                padding: 2px 4px;
+            }
+            .appointment .note-icon {
+                font-size: 0.7rem;
+            }
         }
     </style>
 </head>
