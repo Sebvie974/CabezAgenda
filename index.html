@@ -888,14 +888,16 @@
             
             renderCalendar();
 
-            practitionerFilter.addEventListener('change', renderCalendar);
-            dateSelect.addEventListener('change', renderCalendar);
-            adminKineSelect.addEventListener('change', (e) => loadAdminForm(e.target.value));
+            // Ajout des sécurités ?. (Optional Chaining) partout pour éviter les plantages
+            practitionerFilter?.addEventListener('change', renderCalendar);
+            dateSelect?.addEventListener('change', renderCalendar);
             
-            document.getElementById('openAdminBtn').addEventListener('click', () => { 
+            const adminSelect = document.getElementById('adminKineSelect');
+            adminSelect?.addEventListener('change', (e) => loadAdminForm(e.target.value));
+            
+            document.getElementById('openAdminBtn')?.addEventListener('click', () => { 
                 loadAdminForm(adminKineSelect.value || Object.keys(kinesConfig)[0]); 
                 
-                // Remplir le menu déroulant pour affecter un remplaçant
                 const linkSelect = document.getElementById('newAccKineLink');
                 if(linkSelect) {
                     linkSelect.innerHTML = '';
@@ -903,14 +905,21 @@
                         linkSelect.innerHTML += `<option value="${k}">${kinesConfig[k].name}</option>`;
                     }
                 }
-                adminModal.style.display = 'flex'; 
+                const adminMod = document.getElementById('adminModal');
+                if(adminMod) adminMod.style.display = 'flex'; 
             });
-            document.getElementById('closeAdminBtn').addEventListener('click', () => adminModal.style.display = 'none');
-            document.getElementById('saveKineBtn').addEventListener('click', saveKineConfiguration);
-            document.getElementById('addKineBtn').addEventListener('click', createNewKine);
+            
+            document.getElementById('closeAdminBtn')?.addEventListener('click', () => {
+                const adminMod = document.getElementById('adminModal');
+                if(adminMod) adminMod.style.display = 'none';
+            });
+            
+            document.getElementById('saveKineBtn')?.addEventListener('click', saveKineConfiguration);
+            
+            // L'erreur venait d'ici : l'appel à addKineBtn a été supprimé
 
             const secBtn = document.getElementById('toggleSecretariatBtn');
-            secBtn.addEventListener('click', () => {
+            secBtn?.addEventListener('click', () => {
                 window.isSecretariatMode = !window.isSecretariatMode;
                 if (window.isSecretariatMode) {
                     document.body.classList.add('secretariat-mode');
@@ -924,22 +933,19 @@
             });
 
             const patientInput = document.getElementById('newPatientName');
-            patientInput.addEventListener('input', (e) => window.fillPatientData(e.target.value));
-            patientInput.addEventListener('change', (e) => window.fillPatientData(e.target.value));
+            patientInput?.addEventListener('input', (e) => window.fillPatientData(e.target.value));
+            patientInput?.addEventListener('change', (e) => window.fillPatientData(e.target.value));
 
-            // NOUVEAU : Écouteur de l'input de recherche globale
             const globalSearch = document.getElementById('globalPatientSearch');
-            if(globalSearch) {
-                globalSearch.addEventListener('change', (e) => {
-                    window.openPatientHistoryGlobal(e.target.value);
-                    e.target.value = ''; 
-                });
-            }
+            globalSearch?.addEventListener('change', (e) => {
+                window.openPatientHistoryGlobal(e.target.value);
+                e.target.value = ''; 
+            });
 
-            document.getElementById('saveDayBtn').addEventListener('click', saveDayConfiguration);
-            document.getElementById('resetDayBtn').addEventListener('click', resetDayConfiguration);
-            document.getElementById('prevDateBtn').addEventListener('click', () => shiftDate(window.innerWidth <= 768 ? -1 : -7));
-            document.getElementById('nextDateBtn').addEventListener('click', () => shiftDate(window.innerWidth <= 768 ? 1 : 7));
+            document.getElementById('saveDayBtn')?.addEventListener('click', saveDayConfiguration);
+            document.getElementById('resetDayBtn')?.addEventListener('click', resetDayConfiguration);
+            document.getElementById('prevDateBtn')?.addEventListener('click', () => shiftDate(window.innerWidth <= 768 ? -1 : -7));
+            document.getElementById('nextDateBtn')?.addEventListener('click', () => shiftDate(window.innerWidth <= 768 ? 1 : 7));
 
             window.addEventListener('resize', () => {
                 if (window.innerWidth <= 768 && practitionerFilter.value === 'all') practitionerFilter.value = Object.keys(kinesConfig)[0];
