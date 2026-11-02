@@ -2033,27 +2033,44 @@
         }
 
         // --- SYNCHRONISATION TEMPS RÉEL (SUPABASE REALTIME) ---
+        // --- SYNCHRONISATION TEMPS RÉEL (SUPABASE REALTIME) ---
         window.setupRealtimeSubscriptions = function() {
+            // 1. On nettoie les anciens canaux pour éviter les bugs si le réseau a sauté
+            supabaseClient.removeAllChannels();
+
             supabaseClient
               .channel('cabinet-global-channel')
-              // Écoute les changements sur les rendez-vous
               .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, async (payload) => {
                   await loadDataFromSupabase();
                   renderCalendar();
                   updatePatientSuggestions();
               })
-              // Écoute les changements sur la configuration (les kinés, les horaires)
               .on('postgres_changes', { event: '*', schema: 'public', table: 'app_config' }, async (payload) => {
                   await loadDataFromSupabase();
                   updateKineSelects();
                   renderCalendar();
               })
-              // Écoute les changements sur les notes
               .on('postgres_changes', { event: '*', schema: 'public', table: 'cabinet_notes' }, (payload) => {
                   loadCabinetNotes();
               })
-              .subscribe();
+              .subscribe((status) => {
+                  // 2. Permet de vérifier dans la console F12 si le canal est bien ouvert
+                  if(status === 'SUBSCRIBED') {
+                      console.log('📡 Connexion Temps Réel Supabase : ACTIVE');
+                  }
+              });
         };
+
+        // --- ANTI-VEILLE POUR SMARTPHONES (PWA) ---
+        // Force la mise à jour dès qu'on rallume l'écran ou qu'on rouvre l'appli
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                console.log('📱 Retour sur l\'appli -> Rafraîchissement forcé');
+                await loadDataFromSupabase();
+                renderCalendar();
+                setupRealtimeSubscriptions(); // Relance l'écoute réseau
+            }
+        });
 
         async function checkAuth() {
             const { data: { session } } = await supabaseClient.auth.getSession();
