@@ -663,7 +663,7 @@
 
         // --- EXPORT / IMPORT JSON ---
         window.exportData = function() {
-            const data = { kinesConfig, appointements, apptTypesConfig };
+            const data = { kinesConfig, appointments, apptTypesConfig };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
             const dlAnchorNode = document.createElement('a');
             dlAnchorNode.setAttribute("href", dataStr);
@@ -679,7 +679,7 @@
                 try {
                     const imported = JSON.parse(e.target.result);
                     if (imported.kinesConfig) kinesConfig = imported.kinesConfig;
-                    if (imported.appointements) appointements = imported.appointements;
+                    if (imported.appointments) appointments = imported.appointments;
                     if (imported.apptTypesConfig) apptTypesConfig = imported.apptTypesConfig;
                     saveData(); alert("Restauration réussie ! Le planning va se recharger."); location.reload();
                 } catch (err) { alert("Erreur lors de la lecture du fichier JSON."); }
@@ -722,13 +722,15 @@
         const dayConfigModal = document.getElementById('dayConfigModal');
 
         // --- AUTO-COMPLÉTION PATIENTS ---
+        // --- AUTO-COMPLÉTION PATIENTS ---
         function updatePatientSuggestions() {
             const datalist = document.getElementById('patientsList');
             const globalDatalist = document.getElementById('globalPatientsList');
             if(datalist) datalist.innerHTML = ''; 
             if(globalDatalist) globalDatalist.innerHTML = '';
 
-            const allNames = appointements.map(appt => appt.patient).filter(name => name && name !== 'Indisponible' && name !== 'Patient');
+            // Utilisation de l'orthographe correcte : appointments
+            const allNames = appointments.map(appt => appt.patient).filter(name => name && name !== 'Indisponible' && name !== 'Patient');
             const uniqueNames = [...new Set(allNames)].sort();
             uniqueNames.forEach(name => {
                 const option = document.createElement('option');
@@ -750,7 +752,7 @@
             let foundPhones = [];
             let foundNote = '';
             
-            const patientAppts = appointements.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
+            const patientAppts = appointments.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
             
             if (patientAppts.length > 0) {
                 const apptWithPhone = [...patientAppts].reverse().find(a => a.phones && a.phones.length > 0);
@@ -780,7 +782,7 @@
         window.openPatientHistoryGlobal = function(typedName) {
             if(!typedName) return;
             const searchName = typedName.trim().toLowerCase();
-            const patientAppts = appointements.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
+            const patientAppts = appointments.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
             
             const listEl = document.getElementById('globalPatientHistoryList');
             if(!listEl) return;
@@ -848,7 +850,7 @@
 
         window.openEditModalFromHistory = function(apptId) {
             document.getElementById('patientHistoryGlobalModal').style.display = 'none';
-            const appt = appointements.find(a => a.id === apptId);
+            const appt = appointments.find(a => a.id === apptId);
             if(appt) {
                 // Change la date de fond pour sauter vers le jour du RDV
                 document.getElementById('dateSelect').value = appt.exactDate;
@@ -1368,7 +1370,7 @@
                 await supabaseClient.from('appointments').delete().eq('id', id);
                 
                 // Mise à jour de l'affichage local
-                appointements = appointements.filter(a => a.id !== id);
+                appointments = appointments.filter(a => a.id !== id);
                 updatePatientSuggestions(); 
                 document.getElementById('addApptModal').style.display = 'none'; 
                 renderCalendar();
@@ -1376,7 +1378,7 @@
         };
 
         window.saveUnavailableSlot = function() {
-            appointements.push({
+            appointments.push({
                 id: Date.now(), kineId: document.getElementById('newApptKine').value, dayIndex: parseInt(document.getElementById('newApptDay').value),
                 exactDate: document.getElementById('newApptExactDate').value,
                 timeStr: document.getElementById('newApptTime').value, duration: parseInt(document.getElementById('newApptDuration').value),
@@ -1494,8 +1496,8 @@
             if (editId) {
                 baseApptData.id = parseInt(editId);
                 baseApptData.exactDate = baseDate;
-                const index = appointements.findIndex(a => a.id === baseApptData.id);
-                if (index !== -1) appointements[index] = baseApptData;
+                const index = appointments.findIndex(a => a.id === baseApptData.id);
+                if (index !== -1) appointments[index] = baseApptData;
             } else {
                 const dateParts = baseDate ? baseDate.split('-') : [];
                 const startDateObj = baseDate ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2]) : new Date();
@@ -1532,7 +1534,7 @@
                         }
                         if (iterationCount > 0) newAppt.isFirstVisit = false;
                         
-                        appointements.push(newAppt);
+                        appointments.push(newAppt);
                         iterationCount++;
                     }
                 }
@@ -1540,7 +1542,7 @@
 
             // NOUVEAU : Synchronisation globale du numéro de téléphone ET des notes au patient !
             if (patientNameStr !== 'Indisponible' && patientNameStr !== 'Patient') {
-                appointements.forEach(a => {
+                appointments.forEach(a => {
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
                         a.phones = [...phonesArray];
                         a.note = currentNote;
@@ -1667,12 +1669,12 @@
                 const snappedMins = Math.floor(totalMins / config.slotDuration) * config.slotDuration;
                 const newTimeStr = `${(Math.floor(snappedMins / 60) + START_HOUR).toString().padStart(2,'0')}:${(snappedMins % 60).toString().padStart(2, '0')}`;
 
-                const index = appointements.findIndex(a => a.id === apptId);
+                const index = appointments.findIndex(a => a.id === apptId);
                 if (index !== -1) {
-                    appointements[index].kineId = kineId;
-                    appointements[index].dayIndex = dayIndex;
-                    appointements[index].exactDate = exactDate; 
-                    appointements[index].timeStr = newTimeStr;
+                    appointments[index].kineId = kineId;
+                    appointments[index].dayIndex = dayIndex;
+                    appointments[index].exactDate = exactDate; 
+                    appointments[index].timeStr = newTimeStr;
                     saveData(); renderCalendar();
                 }
             });
@@ -1695,7 +1697,7 @@
             drawBlock(daySchedule.pauseStart, daySchedule.pauseEnd);
             if (daySchedule.end < END_HOUR) drawBlock(daySchedule.end, END_HOUR);
 
-            const dailyAppts = appointements.filter(a => a.kineId === kineId && (a.exactDate === exactDate || (!a.exactDate && a.dayIndex === dayIndex)));
+            const dailyAppts = appointments.filter(a => a.kineId === kineId && (a.exactDate === exactDate || (!a.exactDate && a.dayIndex === dayIndex)));
             const timeGroups = {};
             dailyAppts.forEach(appt => {
                 if (!timeGroups[appt.timeStr]) timeGroups[appt.timeStr] = [];
@@ -1728,7 +1730,7 @@
                             e.stopPropagation(); 
                             if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
                                 await supabaseClient.from('appointments').delete().eq('id', appt.id);
-                                appointements = appointements.filter(a => a.id !== appt.id);
+                                appointments = appointments.filter(a => a.id !== appt.id);
                                 saveData(); updatePatientSuggestions(); renderCalendar();
                             }
                         });
@@ -1821,8 +1823,8 @@
                             e.stopPropagation(); 
                             if (window.isSecretariatMode) {
                                 appt.vegaPointed = !appt.vegaPointed;
-                                const idx = appointements.findIndex(a => a.id === appt.id);
-                                if (idx !== -1) appointements[idx].vegaPointed = appt.vegaPointed;
+                                const idx = appointments.findIndex(a => a.id === appt.id);
+                                if (idx !== -1) appointments[idx].vegaPointed = appt.vegaPointed;
                                 saveData();
                                 renderCalendar();
                             } else {
