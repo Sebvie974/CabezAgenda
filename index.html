@@ -1008,6 +1008,127 @@
             });
         };
 
+        // Fonction pour recaler la date au Lundi de la semaine en cours
+        function snapToMonday(dateStr) {
+            const d = new Date(dateStr);
+            let day = d.getDay();
+            if (day === 0) day = 7;
+            d.setDate(d.getDate() - day + 1);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+
+        async function init() {
+            const dateInput = document.getElementById('dateSelect');
+            if(dateInput && !dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+            
+            // Si on est sur PC (vue semaine), on force l'input à afficher le Lundi
+            if (dateInput && window.innerWidth > 768) {
+                dateInput.value = snapToMonday(dateInput.value);
+            }
+            
+            await loadDataFromSupabase(); 
+            
+            updateKineSelects(); 
+            updatePatientSuggestions();
+            
+            const pFilter = document.getElementById('practitionerFilter');
+            if (window.innerWidth <= 768 && pFilter && pFilter.value === 'all') pFilter.value = Object.keys(kinesConfig)[0];
+            
+            renderCalendar();
+
+            pFilter?.addEventListener('change', renderCalendar);
+            
+            dateInput?.addEventListener('change', (e) => {
+                // Recalcule le Lundi à chaque changement manuel de date sur PC
+                if (window.innerWidth > 768) {
+                    e.target.value = snapToMonday(e.target.value);
+                }
+                renderCalendar();
+            });
+            
+            document.getElementById('adminKineSelect')?.addEventListener('change', (e) => loadAdminForm(e.target.value));
+            
+            document.getElementById('openAdminBtn')?.addEventListener('click', () => { 
+                const adminSelect = document.getElementById('adminKineSelect');
+                loadAdminForm(adminSelect ? adminSelect.value : Object.keys(kinesConfig)[0]); 
+                
+                const linkSelect = document.getElementById('newAccKineLink');
+                if(linkSelect) {
+                    linkSelect.innerHTML = '';
+                    for(let k in kinesConfig) {
+                        linkSelect.innerHTML += `<option value="${k}">${kinesConfig[k].name}</option>`;
+                    }
+                }
+                const adminMod = document.getElementById('adminModal');
+                if(adminMod) adminMod.style.display = 'flex'; 
+            });
+            
+            document.getElementById('closeAdminBtn')?.addEventListener('click', () => {
+                const adminMod = document.getElementById('adminModal');
+                if(adminMod) adminMod.style.display = 'none';
+            });
+            
+            document.getElementById('saveKineBtn')?.addEventListener('click', saveKineConfiguration);
+
+            const secBtn = document.getElementById('toggleSecretariatBtn');
+            secBtn?.addEventListener('click', () => {
+                window.isSecretariatMode = !window.isSecretariatMode;
+                if (window.isSecretariatMode) {
+                    document.body.classList.add('secretariat-mode');
+                    secBtn.style.backgroundColor = '#e53e3e';
+                    secBtn.innerHTML = '🔴 Quitter Pointage';
+                } else {
+                    document.body.classList.remove('secretariat-mode');
+                    secBtn.style.backgroundColor = '#805ad5';
+                    secBtn.innerHTML = '📠 Pointage';
+                }
+            });
+
+            const patientInput = document.getElementById('newPatientName');
+            patientInput?.addEventListener('input', (e) => window.fillPatientData(e.target.value));
+            patientInput?.addEventListener('change', (e) => window.fillPatientData(e.target.value));
+
+            const globalSearch = document.getElementById('globalPatientSearch');
+            globalSearch?.addEventListener('change', (e) => {
+                window.openPatientHistoryGlobal(e.target.value);
+                e.target.value = ''; 
+            });
+
+            document.getElementById('saveDayBtn')?.addEventListener('click', saveDayConfiguration);
+            document.getElementById('resetDayBtn')?.addEventListener('click', resetDayConfiguration);
+            
+            document.getElementById('prevDateBtn')?.addEventListener('click', () => {
+                shiftDate(window.innerWidth <= 768 ? -1 : -7);
+                if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
+            });
+            
+            document.getElementById('nextDateBtn')?.addEventListener('click', () => {
+                shiftDate(window.innerWidth <= 768 ? 1 : 7);
+                if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
+            });
+
+            window.addEventListener('resize', () => {
+                if (window.innerWidth <= 768 && pFilter && pFilter.value === 'all') pFilter.value = Object.keys(kinesConfig)[0];
+                if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
+                renderCalendar();
+            });
+        }
+
+        async function checkAuth() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                await loadUserProfile(session.user.id);
+                const authScr = document.getElementById('authScreen');
+                if(authScr) authScr.style.display = 'none';
+                init(); // Lancement de l'application
+            } else {
+                const authScr = document.getElementById('authScreen');
+                if(authScr) authScr.style.display = 'flex';
+            }
+        }
+
+        window.onload = checkAuth;
+
         // --- NAVIGATION VUES ---
         window.switchToSingleView = function(kineId) { practitionerFilter.value = kineId; renderCalendar(); };
         window.switchToGlobalView = function() { practitionerFilter.value = 'all'; renderCalendar(); };
@@ -1775,38 +1896,39 @@
         // --- AUTHENTIFICATION ET PROFILS ---
         let currentUserProfile = null;
 
+        // --- AUTHENTIFICATION, PROFILS ET MOT DE PASSE ---
         window.loginUser = async function() {
             let loginInput = document.getElementById('loginEmail').value.trim().toLowerCase();
             const password = document.getElementById('loginPassword').value;
             
             if(!loginInput || !password) return;
 
-            // Si l'utilisateur a juste tapé son prénom, on fabrique l'email en arrière-plan
             if (!loginInput.includes('@')) {
-                // On retire les accents et caractères spéciaux comme lors de la création
                 loginInput = loginInput.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
                 loginInput = `${loginInput}@cabinet.fr`;
             }
             
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email: loginInput, password: password });
             if (error) {
-                document.getElementById('loginError').style.display = 'block';
+                const errEl = document.getElementById('loginError');
+                if(errEl) errEl.style.display = 'block';
             } else {
-                document.getElementById('loginError').style.display = 'none';
+                const errEl = document.getElementById('loginError');
+                if(errEl) errEl.style.display = 'none';
                 await loadUserProfile(data.user.id);
-                document.getElementById('authScreen').style.display = 'none';
+                const authScr = document.getElementById('authScreen');
+                if(authScr) authScr.style.display = 'none';
                 
-                // On vide les champs pour la prochaine fois
                 document.getElementById('loginEmail').value = '';
                 document.getElementById('loginPassword').value = '';
                 
-                init(); // Lance l'application une fois connecté
+                init(); 
             }
         };
 
         window.logoutUser = async function() {
             await supabaseClient.auth.signOut();
-            location.reload(); // Recharge la page pour revenir à l'écran de connexion
+            location.reload(); 
         };
 
         async function loadUserProfile(userId) {
@@ -1814,28 +1936,16 @@
             if (data) {
                 currentUserProfile = data;
                 
-                // RESTRICTION : Si l'utilisateur n'est pas 'admin', on cache le bouton Pointage et Config
                 const secBtn = document.getElementById('toggleSecretariatBtn');
                 const confBtn = document.getElementById('openAdminBtn');
                 
                 if (currentUserProfile.role !== 'admin') {
                     if(secBtn) secBtn.style.display = 'none';
-                    if(confBtn) confBtn.style.display = 'none'; // Seul l'admin configure le cabinet
+                    if(confBtn) confBtn.style.display = 'none'; 
                 } else {
                     if(secBtn) secBtn.style.display = 'inline-block';
                     if(confBtn) confBtn.style.display = 'inline-block';
                 }
-            }
-        }
-
-        async function checkAuth() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) {
-                await loadUserProfile(session.user.id);
-                document.getElementById('authScreen').style.display = 'none';
-                init(); // Lance l'application si déjà connecté
-            } else {
-                document.getElementById('authScreen').style.display = 'flex';
             }
         }
 
@@ -1858,8 +1968,126 @@
             }
         };
 
+        // --- INITIALISATION ET GESTION DU CALENDRIER ---
+        function snapToMonday(dateStr) {
+            const d = new Date(dateStr);
+            let day = d.getDay();
+            if (day === 0) day = 7;
+            d.setDate(d.getDate() - day + 1);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+
+        async function init() {
+            const dateInput = document.getElementById('dateSelect');
+            if(dateInput && !dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+            
+            if (dateInput && window.innerWidth > 768) {
+                dateInput.value = snapToMonday(dateInput.value);
+            }
+            
+            await loadDataFromSupabase(); 
+            
+            updateKineSelects(); 
+            updatePatientSuggestions();
+            
+            const pFilter = document.getElementById('practitionerFilter');
+            if (window.innerWidth <= 768 && pFilter && pFilter.value === 'all') pFilter.value = Object.keys(kinesConfig)[0];
+            
+            renderCalendar();
+
+            pFilter?.addEventListener('change', renderCalendar);
+            
+            dateInput?.addEventListener('change', (e) => {
+                if (window.innerWidth > 768) {
+                    e.target.value = snapToMonday(e.target.value);
+                }
+                renderCalendar();
+            });
+            
+            document.getElementById('adminKineSelect')?.addEventListener('change', (e) => loadAdminForm(e.target.value));
+            
+            document.getElementById('openAdminBtn')?.addEventListener('click', () => { 
+                const adminSelect = document.getElementById('adminKineSelect');
+                loadAdminForm(adminSelect ? adminSelect.value : Object.keys(kinesConfig)[0]); 
+                
+                const linkSelect = document.getElementById('newAccKineLink');
+                if(linkSelect) {
+                    linkSelect.innerHTML = '';
+                    for(let k in kinesConfig) {
+                        linkSelect.innerHTML += `<option value="${k}">${kinesConfig[k].name}</option>`;
+                    }
+                }
+                const adminMod = document.getElementById('adminModal');
+                if(adminMod) adminMod.style.display = 'flex'; 
+            });
+            
+            document.getElementById('closeAdminBtn')?.addEventListener('click', () => {
+                const adminMod = document.getElementById('adminModal');
+                if(adminMod) adminMod.style.display = 'none';
+            });
+            
+            document.getElementById('saveKineBtn')?.addEventListener('click', saveKineConfiguration);
+
+            const secBtn = document.getElementById('toggleSecretariatBtn');
+            secBtn?.addEventListener('click', () => {
+                window.isSecretariatMode = !window.isSecretariatMode;
+                if (window.isSecretariatMode) {
+                    document.body.classList.add('secretariat-mode');
+                    secBtn.style.backgroundColor = '#e53e3e';
+                    secBtn.innerHTML = '🔴 Quitter Pointage';
+                } else {
+                    document.body.classList.remove('secretariat-mode');
+                    secBtn.style.backgroundColor = '#805ad5';
+                    secBtn.innerHTML = '📠 Pointage';
+                }
+            });
+
+            const patientInput = document.getElementById('newPatientName');
+            patientInput?.addEventListener('input', (e) => window.fillPatientData(e.target.value));
+            patientInput?.addEventListener('change', (e) => window.fillPatientData(e.target.value));
+
+            const globalSearch = document.getElementById('globalPatientSearch');
+            globalSearch?.addEventListener('change', (e) => {
+                window.openPatientHistoryGlobal(e.target.value);
+                e.target.value = ''; 
+            });
+
+            document.getElementById('saveDayBtn')?.addEventListener('click', saveDayConfiguration);
+            document.getElementById('resetDayBtn')?.addEventListener('click', resetDayConfiguration);
+            
+            document.getElementById('prevDateBtn')?.addEventListener('click', () => {
+                shiftDate(window.innerWidth <= 768 ? -1 : -7);
+                if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
+            });
+            
+            document.getElementById('nextDateBtn')?.addEventListener('click', () => {
+                shiftDate(window.innerWidth <= 768 ? 1 : 7);
+                if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
+            });
+
+            window.addEventListener('resize', () => {
+                if (window.innerWidth <= 768 && pFilter && pFilter.value === 'all') pFilter.value = Object.keys(kinesConfig)[0];
+                if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
+                renderCalendar();
+            });
+        }
+
+        async function checkAuth() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                await loadUserProfile(session.user.id);
+                const authScr = document.getElementById('authScreen');
+                if(authScr) authScr.style.display = 'none';
+                init(); 
+            } else {
+                const authScr = document.getElementById('authScreen');
+                if(authScr) authScr.style.display = 'flex';
+            }
+        }
+
         window.onload = checkAuth;
 
+        // --- PWA SERVICE WORKER ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js').catch(err => console.log('Erreur SW', err));
