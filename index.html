@@ -1318,53 +1318,59 @@
             if (modal) modal.style.display = 'flex';
         };
 
-        window.openEditModal = function(appt) {
-            const kineSelect = document.getElementById('newApptKine');
-            kineSelect.innerHTML = '';
-            for(let k in kinesConfig) { kineSelect.innerHTML += `<option value="${k}">${kinesConfig[k].name}</option>`; }
-            kineSelect.value = appt.kineId;
-            updateTypeSelectLabels(appt.kineId);
-            updateStatusSelectLabels();
+        window.openEditModal = function(apptId) {
+            const appt = appointments.find(a => a.id === apptId);
+            if (!appt) return;
+
+            // Sécurité : on vérifie que l'élément existe avant de lui attribuer une valeur
+            const safeSetValue = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            };
+            const safeSetChecked = (id, isChecked) => {
+                const el = document.getElementById(id);
+                if (el) el.checked = isChecked;
+            };
+
+            safeSetValue('editApptId', appt.id);
+            safeSetValue('newApptKine', appt.kine);
+            safeSetValue('newApptDay', appt.date);
+            safeSetValue('newApptTime', appt.time);
             
-            document.getElementById('editApptId').value = appt.id;
-            document.getElementById('newApptDay').value = appt.dayIndex;
-            document.getElementById('newApptExactDate').value = appt.exactDate || '';
-            document.getElementById('newApptTime').value = appt.timeStr;
-            document.getElementById('newApptDuration').value = appt.duration;
+            safeSetValue('newPatientName', appt.patient || '');
+            safeSetValue('newApptNotes', appt.notes || '');
+            safeSetValue('newApptRemaining', appt.remaining || '');
+            safeSetValue('newApptDuration', appt.duration || (kinesConfig[appt.kine]?.slotDuration || 30));
             
-            document.getElementById('newPatientName').value = appt.patient;
-            document.getElementById('newApptNotes').value = appt.note || '';
-            document.getElementById('newApptType').value = appt.apptType || '';
-            document.getElementById('newApptStatus').value = appt.status || ''; 
-            document.getElementById('newApptImportant').checked = appt.isImportant || false;
-            document.getElementById('newApptFirstVisit').checked = appt.isFirstVisit || false;
-            document.getElementById('newApptLastVisit').checked = appt.isLastVisit || false;
-            document.getElementById('newApptCV').checked = appt.isCV || false;
-            document.getElementById('newApptRemaining').value = (appt.remainingSessions !== undefined && appt.remainingSessions !== null) ? appt.remainingSessions : '';
-            
-            document.getElementById('newApptRecurrence').value = 1;
-            document.getElementById('recurrenceContainer').style.display = 'none'; 
-            
-            const container = document.getElementById('phoneInputsContainer');
-            container.innerHTML = '';
-            if (appt.phones && appt.phones.length > 0) {
-                appt.phones.forEach((phone, index) => {
-                    container.innerHTML += `<div style="display: flex; gap: 5px;"><input type="tel" class="appt-phone-input" value="${phone}"><button class="btn-cancel" style="padding: 0 10px; ${index !== 0 ? 'border-color: #e53e3e; color: #e53e3e;' : ''}" onclick="${index === 0 ? 'addPhoneField()' : 'this.parentElement.remove()'}">${index === 0 ? '+' : '-'}</button></div>`;
-                });
-            } else {
-                container.innerHTML = `<div style="display: flex; gap: 5px;"><input type="tel" class="appt-phone-input"><button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()">+</button></div>`;
+            const typeSelect = document.getElementById('newApptType');
+            if (typeSelect) {
+                const optionExists = Array.from(typeSelect.options).some(opt => opt.value === appt.type);
+                if (!optionExists && appt.type) {
+                    typeSelect.innerHTML += `<option value="${appt.type}">${appt.type}</option>`;
+                }
+                typeSelect.value = appt.type || '';
             }
+
+            safeSetChecked('newApptImportant', appt.important || false);
+            safeSetChecked('newApptFirstVisit', appt.firstVisit || false);
+            safeSetChecked('newApptLastVisit', appt.lastVisit || false);
+            safeSetChecked('newApptCV', appt.cv || false);
+
+            const title = document.getElementById('modalTitle');
+            if (title) title.innerText = 'Modifier le Rendez-vous';
+
+            const delBtn = document.getElementById('deleteApptBtn');
+            if (delBtn) delBtn.style.display = 'inline-block';
             
-            document.getElementById('modalTitle').textContent = `Modifier Rendez-vous`;
-            document.getElementById('addSameSlotBtn').style.display = 'inline-block'; 
-            document.getElementById('deleteApptBtn').style.display = 'inline-block'; 
-            document.getElementById('blockSlotBtn').style.display = 'none'; 
-            document.getElementById('confirmApptBtn').textContent = 'Modifier';
-            
-            // Appelle la fonction pour afficher l'historique et les notes si existantes
-            window.fillPatientData(appt.patient);
-            
-            document.getElementById('addApptModal').style.display = 'flex';
+            const sameBtn = document.getElementById('addSameSlotBtn');
+            if (sameBtn) sameBtn.style.display = 'inline-block';
+
+            if (typeof window.fillPatientData === 'function' && appt.patient) {
+                window.fillPatientData(appt.patient);
+            }
+
+            const modal = document.getElementById('addApptModal');
+            if (modal) modal.style.display = 'flex';
         };
 
         window.triggerAddSameSlot = function() {
