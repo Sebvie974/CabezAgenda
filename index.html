@@ -1362,27 +1362,36 @@
         };
 
         window.deleteAppointment = async function() {
-            const id = parseInt(document.getElementById('editApptId').value);
+            const idEl = document.getElementById('editApptId');
+            if(!idEl || !idEl.value) return;
+            const id = parseInt(idEl.value);
+            
             if(confirm("Confirmer la suppression de ce rendez-vous ?")) {
-                // Suppression directe dans la base de données Supabase
                 await supabaseClient.from('appointments').delete().eq('id', id);
-                
-                // Mise à jour de l'affichage local
                 appointments = appointments.filter(a => a.id !== id);
                 updatePatientSuggestions(); 
-                document.getElementById('addApptModal').style.display = 'none'; 
+                const mod = document.getElementById('addApptModal');
+                if(mod) mod.style.display = 'none'; 
                 renderCalendar();
             }
         };
 
         window.saveUnavailableSlot = function() {
+            const kineId = document.getElementById('newApptKine') ? document.getElementById('newApptKine').value : '';
+            const dayIdx = document.getElementById('newApptDay') ? parseInt(document.getElementById('newApptDay').value) : 0;
+            const exDate = document.getElementById('newApptExactDate') ? document.getElementById('newApptExactDate').value : new Date().toISOString().split('T')[0];
+            const tStr = document.getElementById('newApptTime') ? document.getElementById('newApptTime').value : '08:00';
+            const dur = document.getElementById('newApptDuration') ? parseInt(document.getElementById('newApptDuration').value) : 30;
+
             appointments.push({
-                id: Date.now(), kineId: document.getElementById('newApptKine').value, dayIndex: parseInt(document.getElementById('newApptDay').value),
-                exactDate: document.getElementById('newApptExactDate').value,
-                timeStr: document.getElementById('newApptTime').value, duration: parseInt(document.getElementById('newApptDuration').value),
+                id: Date.now(), kineId: kineId, dayIndex: dayIdx,
+                exactDate: exDate, timeStr: tStr, duration: dur,
                 patient: 'Indisponible', type: 'unavailable' 
             });
-            saveData(); document.getElementById('addApptModal').style.display = 'none'; renderCalendar();
+            saveData(); 
+            const mod = document.getElementById('addApptModal');
+            if(mod) mod.style.display = 'none'; 
+            renderCalendar();
         };
 
         window.createAccount = async function() {
@@ -1460,36 +1469,41 @@
         };
 
         window.saveNewAppointment = function() {
+            // Sécurité : lit la valeur seulement si le champ HTML existe
+            const getVal = (id, def = '') => { const el = document.getElementById(id); return el ? el.value : def; };
+            const getCheck = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
+
             const phoneInputs = document.querySelectorAll('.appt-phone-input');
             const phonesArray = Array.from(phoneInputs).map(input => input.value.trim()).filter(val => val !== '');
-            const editId = document.getElementById('editApptId').value;
-            const remainingVal = document.getElementById('newApptRemaining').value;
-            const currentNote = document.getElementById('newApptNotes').value.trim();
             
-            const recurrenceWeeks = parseInt(document.getElementById('newApptRecurrence').value) || 1;
+            const editId = getVal('editApptId');
+            const remainingVal = getVal('newApptRemaining');
+            const currentNote = getVal('newApptNotes').trim();
+            
+            const recurrenceWeeks = parseInt(getVal('newApptRecurrence', '1')) || 1;
             const selectedDays = Array.from(document.querySelectorAll('.recurrence-day:checked')).map(cb => parseInt(cb.value));
             
-            const patientNameStr = document.getElementById('newPatientName').value.trim() || 'Patient';
+            const patientNameStr = getVal('newPatientName').trim() || 'Patient';
 
             const baseApptData = {
-                kineId: document.getElementById('newApptKine').value,
-                dayIndex: parseInt(document.getElementById('newApptDay').value),
-                timeStr: document.getElementById('newApptTime').value,
-                duration: parseInt(document.getElementById('newApptDuration').value),
+                kineId: getVal('newApptKine'),
+                dayIndex: parseInt(getVal('newApptDay') || '0'),
+                timeStr: getVal('newApptTime'),
+                duration: parseInt(getVal('newApptDuration', '30')),
                 patient: patientNameStr,
                 note: currentNote,
-                apptType: document.getElementById('newApptType').value,
-                status: document.getElementById('newApptStatus').value,
-                isImportant: document.getElementById('newApptImportant').checked,
-                isFirstVisit: document.getElementById('newApptFirstVisit').checked,
-                isLastVisit: document.getElementById('newApptLastVisit').checked,
-                isCV: document.getElementById('newApptCV').checked,
+                apptType: getVal('newApptType'),
+                status: getVal('newApptStatus'),
+                isImportant: getCheck('newApptImportant'),
+                isFirstVisit: getCheck('newApptFirstVisit'),
+                isLastVisit: getCheck('newApptLastVisit'),
+                isCV: getCheck('newApptCV'),
                 remainingSessions: remainingVal !== '' ? parseInt(remainingVal) : null,
                 phones: phonesArray,
                 type: 'rdv'
             };
 
-            const baseDate = document.getElementById('newApptExactDate').value;
+            const baseDate = getVal('newApptExactDate', new Date().toISOString().split('T')[0]);
 
             if (editId) {
                 baseApptData.id = parseInt(editId);
@@ -1498,7 +1512,7 @@
                 if (index !== -1) appointments[index] = baseApptData;
             } else {
                 const dateParts = baseDate ? baseDate.split('-') : [];
-                const startDateObj = baseDate ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2]) : new Date();
+                const startDateObj = dateParts.length === 3 ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2]) : new Date();
                 
                 let currentDayOfWeek = startDateObj.getDay(); 
                 if (currentDayOfWeek === 0) currentDayOfWeek = 7;
@@ -1538,7 +1552,6 @@
                 }
             }
 
-            // NOUVEAU : Synchronisation globale du numéro de téléphone ET des notes au patient !
             if (patientNameStr !== 'Indisponible' && patientNameStr !== 'Patient') {
                 appointments.forEach(a => {
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
@@ -1548,7 +1561,11 @@
                 });
             }
 
-            saveData(); updatePatientSuggestions(); document.getElementById('addApptModal').style.display = 'none'; renderCalendar();
+            saveData(); 
+            updatePatientSuggestions(); 
+            const mod = document.getElementById('addApptModal');
+            if(mod) mod.style.display = 'none'; 
+            renderCalendar();
         };
 
         function renderTimeAxis() {
@@ -2061,14 +2078,14 @@
               });
         };
 
+              
         // --- ANTI-VEILLE POUR SMARTPHONES (PWA) ---
-        // Force la mise à jour dès qu'on rallume l'écran ou qu'on rouvre l'appli
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible') {
-                console.log('📱 Retour sur l\'appli -> Rafraîchissement forcé');
+                console.log('📱 Retour sur l\'appli -> Rafraîchissement forcé des données');
                 await loadDataFromSupabase();
                 renderCalendar();
-                setupRealtimeSubscriptions(); // Relance l'écoute réseau
+                // Supabase gère seul la reconnexion au WebSocket
             }
         });
 
