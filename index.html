@@ -550,6 +550,7 @@
             <button class="btn-save" id="toggleSecretariatBtn" style="margin-top: 18px; background-color: #805ad5;">📠 Pointage</button>
             <button class="btn-save" id="openAdminBtn" style="margin-top: 18px; background-color: #4a5568;">⚙️ Config</button>
             <button class="btn-save" onclick="openNotesModal()" style="margin-top: 18px; background-color: #d69e2e;" title="Notes du Cabinet">📝 Notes</button>
+            <button class="btn-cancel" onclick="forceAppUpdate()" style="margin-top: 18px; border-color: #ecc94b; color: #d69e2e;" title="Forcer la mise à jour">🔄 MAJ</button>
             <button class="btn-save" onclick="document.getElementById('profileModal').style.display='flex'" style="margin-top: 18px; background-color: #3182ce;" title="Mon Profil">🔑</button>
             <button class="btn-cancel" onclick="logoutUser()" style="margin-top: 18px; border-color: #e53e3e; color: #e53e3e;" title="Se déconnecter">🚪</button>
     </header>
@@ -2110,6 +2111,21 @@
         }
 
         window.onload = checkAuth;
+
+        // --- UTILITAIRE : FORCER LA MISE À JOUR DE LA PWA ---
+        window.forceAppUpdate = async function() {
+            if(confirm("Cela va forcer le téléphone à télécharger la dernière version. Continuer ?")) {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (let r of regs) await r.unregister();
+                }
+                const cacheNames = await caches.keys();
+                for (let name of cacheNames) await caches.delete(name);
+                
+                // On recharge la page avec un paramètre unique pour casser le cache du navigateur
+                window.location.href = window.location.pathname + '?v=' + new Date().getTime();
+            }
+        };
 
         // --- PWA SERVICE WORKER ---
         if ('serviceWorker' in navigator) {
