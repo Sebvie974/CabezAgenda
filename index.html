@@ -578,7 +578,7 @@
 
         // On initialise les variables à vide
         let kinesConfig = {};
-        let mockAppointments = [];
+        let appointments = [];
         let apptTypesConfig = {};
         let statusConfig = {};
 
@@ -1319,10 +1319,17 @@
         };
 
         window.openEditModal = function(apptId) {
-            const appt = appointments.find(a => a.id === apptId);
-            if (!appt) return;
+            // Sécurité : on récupère la liste sans provoquer d'erreur ReferenceError
+            const apptList = (typeof appointments !== 'undefined') ? appointments : (window.appointments || []);
+            
+            // On convertit les ID en chaînes de caractères pour garantir la correspondance
+            const appt = apptList.find(a => String(a.id) === String(apptId));
+            
+            if (!appt) {
+                console.error("Erreur : Rendez-vous introuvable en mémoire pour l'ID", apptId);
+                return;
+            }
 
-            // Sécurité : on vérifie que l'élément existe avant de lui attribuer une valeur
             const safeSetValue = (id, value) => {
                 const el = document.getElementById(id);
                 if (el) el.value = value;
@@ -1340,7 +1347,7 @@
             safeSetValue('newPatientName', appt.patient || '');
             safeSetValue('newApptNotes', appt.notes || '');
             safeSetValue('newApptRemaining', appt.remaining || '');
-            safeSetValue('newApptDuration', appt.duration || (kinesConfig[appt.kine]?.slotDuration || 30));
+            safeSetValue('newApptDuration', appt.duration || 30);
             
             const typeSelect = document.getElementById('newApptType');
             if (typeSelect) {
