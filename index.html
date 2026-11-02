@@ -585,7 +585,6 @@
         // --- CHARGEMENT ASYNCHRONE BDD ---
         async function loadDataFromSupabase() {
             try {
-                // On utilise supabaseClient ici aussi
                 const { data: configData, error: configError } = await supabaseClient.from('app_config').select('*');
                 if (configError) console.error("Erreur config:", configError);
                 
@@ -601,7 +600,8 @@
                 if (apptError) console.error("Erreur RDV:", apptError);
                 
                 if (apptData) {
-                    Appointments = apptData.map(row => ({
+                    // CORRECTION : Utilisation stricte du "a" minuscule pour s'aligner avec le calendrier
+                    appointments = apptData.map(row => ({
                         id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
                         timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
                         apptType: row.appt_type, status: row.status, isImportant: row.is_important,
@@ -616,16 +616,15 @@
 
         // --- SAUVEGARDE ASYNCHRONE VERS SUPABASE ---
         async function saveData() {
-            // 1. Sauvegarde des configurations (Upsert)
             await supabaseClient.from('app_config').upsert([
                 { key: 'kinesConfig', data: kinesConfig },
                 { key: 'apptTypesConfig', data: apptTypesConfig },
                 { key: 'statusConfig', data: statusConfig }
             ]);
 
-            // 2. Sauvegarde des Rendez-vous (Conversion du JS vers le format SQL)
-            if (Appointments.length > 0) {
-                const apptsToSave = Appointments.map(a => ({
+            // CORRECTION : Utilisation stricte du "a" minuscule ici aussi
+            if (appointments && appointments.length > 0) {
+                const apptsToSave = appointments.map(a => ({
                     id: a.id,
                     kine_id: a.kineId,
                     day_index: a.dayIndex,
@@ -645,7 +644,6 @@
                     vega_pointed: a.vegaPointed || false
                 }));
                 
-                // Upsert permet de créer les nouveaux RDV et modifier les existants d'un coup
                 await supabaseClient.from('appointments').upsert(apptsToSave);
             }
         }
