@@ -1027,6 +1027,7 @@
             }
             
             await loadDataFromSupabase(); 
+            setupRealtimeSubscriptions(); // NOUVEAU : Lance l'écoute en temps réel
             
             updateKineSelects(); 
             updatePatientSuggestions();
@@ -2071,6 +2072,29 @@
                 renderCalendar();
             });
         }
+
+        // --- SYNCHRONISATION TEMPS RÉEL (SUPABASE REALTIME) ---
+        window.setupRealtimeSubscriptions = function() {
+            supabaseClient
+              .channel('cabinet-global-channel')
+              // Écoute les changements sur les rendez-vous
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, async (payload) => {
+                  await loadDataFromSupabase();
+                  renderCalendar();
+                  updatePatientSuggestions();
+              })
+              // Écoute les changements sur la configuration (les kinés, les horaires)
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'app_config' }, async (payload) => {
+                  await loadDataFromSupabase();
+                  updateKineSelects();
+                  renderCalendar();
+              })
+              // Écoute les changements sur les notes
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'cabinet_notes' }, (payload) => {
+                  loadCabinetNotes();
+              })
+              .subscribe();
+        };
 
         async function checkAuth() {
             const { data: { session } } = await supabaseClient.auth.getSession();
