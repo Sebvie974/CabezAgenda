@@ -615,38 +615,46 @@
         }
 
         // --- SAUVEGARDE ASYNCHRONE VERS SUPABASE ---
-        async function saveData() {
-            await supabaseClient.from('app_config').upsert([
-                { key: 'kinesConfig', data: kinesConfig },
-                { key: 'apptTypesConfig', data: apptTypesConfig },
-                { key: 'statusConfig', data: statusConfig }
-            ]);
+        window.saveData = async function() {
+            try {
+                await supabaseClient.from('app_config').upsert([
+                    { key: 'kinesConfig', data: kinesConfig },
+                    { key: 'apptTypesConfig', data: apptTypesConfig },
+                    { key: 'statusConfig', data: statusConfig }
+                ]);
 
-            // CORRECTION : Utilisation stricte du "a" minuscule ici aussi
-            if (appointments && appointments.length > 0) {
-                const apptsToSave = appointments.map(a => ({
-                    id: a.id,
-                    kine_id: a.kineId,
-                    day_index: a.dayIndex,
-                    exact_date: a.exactDate,
-                    time_str: a.timeStr,
-                    duration: a.duration,
-                    patient: a.patient,
-                    note: a.note,
-                    appt_type: a.apptType,
-                    status: a.status,
-                    is_important: a.isImportant || false,
-                    is_first_visit: a.isFirstVisit || false,
-                    is_last_visit: a.isLastVisit || false,
-                    is_cv: a.isCV || false,
-                    remaining_sessions: a.remainingSessions || null,
-                    phones: a.phones || [],
-                    vega_pointed: a.vegaPointed || false
-                }));
-                
-                await supabaseClient.from('appointments').upsert(apptsToSave);
+                if (appointments && appointments.length > 0) {
+                    const apptsToSave = appointments.map(a => ({
+                        id: a.id,
+                        kine_id: a.kineId,
+                        day_index: a.dayIndex,
+                        exact_date: a.exactDate,
+                        time_str: a.timeStr,
+                        duration: a.duration,
+                        patient: a.patient,
+                        note: a.note,
+                        appt_type: a.apptType,
+                        status: a.status,
+                        is_important: a.isImportant || false,
+                        is_first_visit: a.isFirstVisit || false,
+                        is_last_visit: a.isLastVisit || false,
+                        is_cv: a.isCV || false,
+                        remaining_sessions: a.remainingSessions || null,
+                        phones: a.phones || [],
+                        vega_pointed: a.vegaPointed || false
+                    }));
+                    
+                    const { error } = await supabaseClient.from('appointments').upsert(apptsToSave);
+                    // NOUVEAU : Si Supabase bloque, on affiche l'erreur en grand !
+                    if (error) {
+                        console.error("Erreur critique de sauvegarde :", error);
+                        alert("Erreur de sauvegarde Supabase : " + error.message);
+                    }
+                }
+            } catch(e) {
+                console.error("Exception saveData :", e);
             }
-        }
+        };
 
         function updateStatusSelectLabels() {
             const select = document.getElementById('newApptStatus');
@@ -1381,21 +1389,25 @@
         };
 
         window.saveUnavailableSlot = function() {
-            const kineId = document.getElementById('newApptKine') ? document.getElementById('newApptKine').value : '';
-            const dayIdx = document.getElementById('newApptDay') ? parseInt(document.getElementById('newApptDay').value) : 0;
-            const exDate = document.getElementById('newApptExactDate') ? document.getElementById('newApptExactDate').value : new Date().toISOString().split('T')[0];
-            const tStr = document.getElementById('newApptTime') ? document.getElementById('newApptTime').value : '08:00';
-            const dur = document.getElementById('newApptDuration') ? parseInt(document.getElementById('newApptDuration').value) : 30;
+            const getVal = (id, def) => { const el = document.getElementById(id); return el && el.value ? el.value : def; };
+            const kineId = getVal('newApptKine', '');
+            const dayIdx = parseInt(getVal('newApptDay', '0'));
+            const exDate = getVal('newApptExactDate', new Date().toISOString().split('T')[0]);
+            const tStr = getVal('newApptTime', '08:00');
+            const dur = parseInt(getVal('newApptDuration', '30'));
 
             appointments.push({
-                id: Date.now(), kineId: kineId, dayIndex: dayIdx,
+                id: Math.floor(Math.random() * 1000000000) + 1000, 
+                kineId: kineId, dayIndex: dayIdx,
                 exactDate: exDate, timeStr: tStr, duration: dur,
                 patient: 'Indisponible', type: 'unavailable' 
             });
-            saveData(); 
-            const mod = document.getElementById('addApptModal');
-            if(mod) mod.style.display = 'none'; 
-            renderCalendar();
+            
+            saveData().then(() => {
+                const mod = document.getElementById('addApptModal');
+                if(mod) mod.style.display = 'none'; 
+                renderCalendar();
+            });
         };
 
         window.createAccount = async function() {
@@ -1473,7 +1485,6 @@
         };
 
         window.saveNewAppointment = function() {
-            // Sécurité : lit la valeur seulement si le champ HTML existe
             const getVal = (id, def = '') => { const el = document.getElementById(id); return el ? el.value : def; };
             const getCheck = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
 
@@ -1540,7 +1551,9 @@
                         const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
                         const dd = String(nextDate.getDate()).padStart(2, '0');
 
-                        const newAppt = { ...baseApptData, id: Date.now() + Math.floor(Math.random() * 10000) };
+                        // CORRECTION MAJEURE : Génération d'un ID compatible avec Supabase (max 2 milliards)
+                        const safeId = Math.floor(Math.random() * 1000000000) + 1000;
+                        const newAppt = { ...baseApptData, id: safeId };
                         newAppt.exactDate = `${yyyy}-${mm}-${dd}`;
                         newAppt.dayIndex = d - 1; 
                         
@@ -1565,11 +1578,13 @@
                 });
             }
 
-            saveData(); 
-            updatePatientSuggestions(); 
-            const mod = document.getElementById('addApptModal');
-            if(mod) mod.style.display = 'none'; 
-            renderCalendar();
+            // On s'assure que la sauvegarde est bien terminée avant de recharger l'affichage
+            saveData().then(() => {
+                updatePatientSuggestions(); 
+                const mod = document.getElementById('addApptModal');
+                if(mod) mod.style.display = 'none'; 
+                renderCalendar();
+            });
         };
 
         function renderTimeAxis() {
