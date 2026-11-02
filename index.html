@@ -1270,47 +1270,52 @@
             }
         };
 
-        window.openAddModal = function(kineId, dayIndex, timeStr, exactDate) {
-            const kineSelect = document.getElementById('newApptKine');
-            kineSelect.innerHTML = '';
-            for(let k in kinesConfig) { kineSelect.innerHTML += `<option value="${k}">${kinesConfig[k].name}</option>`; }
-            kineSelect.value = kineId;
-            updateTypeSelectLabels(kineId); 
-            updateStatusSelectLabels(); 
+        window.openAddModal = function(kine, date, time) {
+            // Sécurité : on vérifie que l'élément existe avant de lui attribuer une valeur
+            const safeSetValue = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            };
+            const safeSetChecked = (id, isChecked) => {
+                const el = document.getElementById(id);
+                if (el) el.checked = isChecked;
+            };
+
+            // Réinitialisation des champs cachés
+            safeSetValue('editApptId', '');
+            safeSetValue('newApptKine', kine);
+            safeSetValue('newApptDay', date);
+            safeSetValue('newApptTime', time);
             
-            document.getElementById('editApptId').value = '';
-            document.getElementById('newApptDay').value = dayIndex;
-            document.getElementById('newApptExactDate').value = exactDate || '';
-            document.getElementById('newApptTime').value = timeStr;
-            document.getElementById('newApptDuration').value = kinesConfig[kineId].slotDuration;
+            // Réinitialisation des champs visibles
+            safeSetValue('newPatientName', '');
+            safeSetValue('newApptNotes', '');
+            safeSetValue('newApptRemaining', '');
             
-            document.getElementById('newPatientName').value = '';
-            document.getElementById('newApptNotes').value = ''; 
-            document.getElementById('newApptType').value = '';
-            document.getElementById('newApptStatus').value = ''; 
-            document.getElementById('newApptImportant').checked = false;
-            document.getElementById('newApptFirstVisit').checked = false;
-            document.getElementById('newApptLastVisit').checked = false;
-            document.getElementById('newApptCV').checked = false;
-            document.getElementById('newApptRemaining').value = '';
+            // Réinitialisation des cases à cocher
+            safeSetChecked('newApptImportant', false);
+            safeSetChecked('newApptFirstVisit', false);
+            safeSetChecked('newApptLastVisit', false);
+            safeSetChecked('newApptCV', false);
+
+            if (kinesConfig && kinesConfig[kine]) {
+                safeSetValue('newApptDuration', kinesConfig[kine].slotDuration || 30);
+            }
+
+            const phoneCont = document.getElementById('phoneInputsContainer');
+            if (phoneCont) phoneCont.innerHTML = '';
+
+            const title = document.getElementById('modalTitle');
+            if (title) title.innerText = 'Nouveau Rendez-vous';
+
+            const delBtn = document.getElementById('deleteApptBtn');
+            if (delBtn) delBtn.style.display = 'none';
             
-            document.getElementById('newApptRecurrence').value = 1;
-            document.getElementById('recurrenceContainer').style.display = 'flex';
-            document.querySelectorAll('.recurrence-day').forEach(cb => cb.checked = (parseInt(cb.value) === dayIndex + 1));
-            
-            document.getElementById('phoneInputsContainer').innerHTML = `<div style="display: flex; gap: 5px;"><input type="tel" class="appt-phone-input" placeholder="06 00 00 00 00"><button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()">+</button></div>`;
-            document.getElementById('modalTitle').textContent = `Nouveau Rendez-vous`;
-            document.getElementById('addSameSlotBtn').style.display = 'none';
-            document.getElementById('deleteApptBtn').style.display = 'none'; 
-            document.getElementById('blockSlotBtn').style.display = 'inline-block'; 
-            document.getElementById('confirmApptBtn').textContent = 'Ajouter';
-            
-            // Cache l'historique à l'ouverture d'un nouveau RDV vide
-            const histCont = document.getElementById('patientHistoryContainer');
-            if (histCont) histCont.style.display = 'none';
-            
-            document.getElementById('addApptModal').style.display = 'flex';
-            document.getElementById('newPatientName').focus();
+            const sameBtn = document.getElementById('addSameSlotBtn');
+            if (sameBtn) sameBtn.style.display = 'none';
+
+            const modal = document.getElementById('addApptModal');
+            if (modal) modal.style.display = 'flex';
         };
 
         window.openEditModal = function(appt) {
