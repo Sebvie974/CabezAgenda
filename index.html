@@ -600,13 +600,13 @@
                 if (apptError) console.error("Erreur RDV:", apptError);
                 
                 if (apptData) {
-                    // CORRECTION : Utilisation stricte du "a" minuscule pour s'aligner avec le calendrier
                     appointments = apptData.map(row => ({
                         id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
                         timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
                         apptType: row.appt_type, status: row.status, isImportant: row.is_important,
                         isFirstVisit: row.is_first_visit, isLastVisit: row.is_last_visit, isCV: row.is_cv,
-                        remainingSessions: row.remaining_sessions, phones: row.phones, vegaPointed: row.vega_pointed
+                        remainingSessions: row.remaining_sessions, phones: row.phones, vegaPointed: row.vega_pointed,
+                        type: row.patient === 'Indisponible' ? 'unavailable' : 'rdv' // <-- Restaure le bloc gris
                     }));
                 }
             } catch (error) {
@@ -2082,6 +2082,7 @@
                 if (document.visibilityState === 'visible') {
                     const oldHash = lastSyncDataHash;
                     await loadDataFromSupabase(); // Téléchargement silencieux
+                    await loadCabinetNotes(); //Synchro Notes
                     
                     // Création d'une empreinte des données
                     lastSyncDataHash = JSON.stringify(appointments) + JSON.stringify(cabinetNotes) + JSON.stringify(kinesConfig);
