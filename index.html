@@ -1684,6 +1684,7 @@
                 const snappedMins = Math.floor(totalMins / config.slotDuration) * config.slotDuration;
                 const newTimeStr = `${(Math.floor(snappedMins / 60) + START_HOUR).toString().padStart(2,'0')}:${(snappedMins % 60).toString().padStart(2, '0')}`;
 
+                // CORRECTION : utilisation de "appointments" au lieu de "mockAppointments"
                 const index = appointments.findIndex(a => a.id === apptId);
                 if (index !== -1) {
                     appointments[index].kineId = kineId;
@@ -1712,6 +1713,7 @@
             drawBlock(daySchedule.pauseStart, daySchedule.pauseEnd);
             if (daySchedule.end < END_HOUR) drawBlock(daySchedule.end, END_HOUR);
 
+            // CORRECTION : utilisation de "appointments"
             const dailyAppts = appointments.filter(a => a.kineId === kineId && (a.exactDate === exactDate || (!a.exactDate && a.dayIndex === dayIndex)));
             const timeGroups = {};
             dailyAppts.forEach(appt => {
@@ -1745,6 +1747,7 @@
                             e.stopPropagation(); 
                             if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
                                 await supabaseClient.from('appointments').delete().eq('id', appt.id);
+                                // CORRECTION : utilisation de "appointments"
                                 appointments = appointments.filter(a => a.id !== appt.id);
                                 saveData(); updatePatientSuggestions(); renderCalendar();
                             }
@@ -1793,7 +1796,6 @@
                         if (appt.isLastVisit) iconHtml += '<span class="note-icon">🛑</span>';
                         if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) iconHtml += '<span class="note-icon">⏳</span>';
                         
-                        // CORRECTION : L'icône des notes n'apparaît que s'il y a du texte dans la note
                         if (appt.note && appt.note.trim().length > 0) iconHtml += '<span class="note-icon">📝</span>';
 
                         let cvIconHtml = appt.isCV ? '<span class="note-icon" style="background-color: #38a169; color: white; padding: 1px 4px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; border: 1px solid #276749;">CV</span>' : '';
@@ -1838,12 +1840,14 @@
                             e.stopPropagation(); 
                             if (window.isSecretariatMode) {
                                 appt.vegaPointed = !appt.vegaPointed;
+                                // CORRECTION : utilisation de "appointments"
                                 const idx = appointments.findIndex(a => a.id === appt.id);
                                 if (idx !== -1) appointments[idx].vegaPointed = appt.vegaPointed;
                                 saveData();
                                 renderCalendar();
                             } else {
-                                openEditModal(appt); 
+                                // CORRECTION MAJEURE : On n'envoie que l'ID (appt.id) et non pas l'objet (appt) !
+                                openEditModal(appt.id); 
                             }
                         });
                     }
