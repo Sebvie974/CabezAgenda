@@ -601,7 +601,7 @@
                 if (apptError) console.error("Erreur RDV:", apptError);
                 
                 if (apptData) {
-                    mockAppointments = apptData.map(row => ({
+                    Appointments = apptData.map(row => ({
                         id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
                         timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
                         apptType: row.appt_type, status: row.status, isImportant: row.is_important,
@@ -624,8 +624,8 @@
             ]);
 
             // 2. Sauvegarde des Rendez-vous (Conversion du JS vers le format SQL)
-            if (mockAppointments.length > 0) {
-                const apptsToSave = mockAppointments.map(a => ({
+            if (Appointments.length > 0) {
+                const apptsToSave = Appointments.map(a => ({
                     id: a.id,
                     kine_id: a.kineId,
                     day_index: a.dayIndex,
