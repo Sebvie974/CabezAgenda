@@ -2028,6 +2028,26 @@
                 if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
                 renderCalendar();
             });
+
+            // --- RECONNEXION DES BOUTONS DE LA MODALE RDV ---
+            document.getElementById('cancelApptBtn')?.addEventListener('click', () => {
+                document.getElementById('addApptModal').style.display = 'none';
+            });
+            document.getElementById('confirmApptBtn')?.addEventListener('click', () => {
+                if (typeof saveAppointment === 'function') saveAppointment();
+                else if (typeof saveAppt === 'function') saveAppt();
+            });
+            document.getElementById('blockSlotBtn')?.addEventListener('click', () => {
+                if (typeof blockSlot === 'function') blockSlot();
+                else if (typeof blockAppointment === 'function') blockAppointment();
+            });
+            document.getElementById('deleteApptBtn')?.addEventListener('click', () => {
+                if (typeof deleteAppointment === 'function') deleteAppointment();
+                else if (typeof deleteAppt === 'function') deleteAppt();
+            });
+            document.getElementById('addSameSlotBtn')?.addEventListener('click', () => {
+                if (typeof addSameSlot === 'function') addSameSlot();
+            });
         }
 
         // --- SYNCHRONISATION TEMPS RÉEL (SUPABASE REALTIME) ---
