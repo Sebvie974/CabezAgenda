@@ -1295,6 +1295,8 @@
             if (phoneCont) phoneCont.innerHTML = '';
 
             const title = document.getElementById('modalTitle');
+            const confirmBtn = document.getElementById('confirmApptBtn');
+            if (confirmBtn) confirmBtn.innerText = 'Ajouter';
             if (title) title.innerText = 'Nouveau Rendez-vous';
 
             const delBtn = document.getElementById('deleteApptBtn');
@@ -1339,6 +1341,8 @@
             safeSetChecked('newApptCV', appt.isCV || false);
 
             const title = document.getElementById('modalTitle');
+            const confirmBtn = document.getElementById('confirmApptBtn');
+            if (confirmBtn) confirmBtn.innerText = 'Modifier';
             if (title) title.innerText = 'Modifier le Rendez-vous';
 
             const delBtn = document.getElementById('deleteApptBtn');
@@ -1950,6 +1954,8 @@
             }
             
             await loadDataFromSupabase(); 
+            lastSyncDataHash = JSON.stringify(appointments) + JSON.stringify(cabinetNotes) + JSON.stringify(kinesConfig);
+            startAutoSync(); // Démarre la vérification toutes les 10 secondes
             
             updateKineSelects(); 
             updatePatientSuggestions();
@@ -2053,7 +2059,30 @@
             });
         }
 
-        // --- SYNCHRONISATION TEMPS RÉEL (SUPABASE REALTIME) ---
+        // --- SYNCHRONISATION GARANTIE (POLLING) ---
+        let lastSyncDataHash = "";
+        window.startAutoSync = function() {
+            setInterval(async () => {
+                // Ne s'exécute que si l'agenda est visible à l'écran
+                if (document.visibilityState === 'visible') {
+                    const oldHash = lastSyncDataHash;
+                    await loadDataFromSupabase(); // Téléchargement silencieux
+                    
+                    // Création d'une empreinte des données
+                    lastSyncDataHash = JSON.stringify(appointments) + JSON.stringify(cabinetNotes) + JSON.stringify(kinesConfig);
+                    
+                    // Si l'empreinte a changé (un collègue a fait une modif), on met à jour l'écran
+                    if (oldHash !== "" && oldHash !== lastSyncDataHash) {
+                        renderCalendar();
+                        updatePatientSuggestions();
+                        if (document.getElementById('notesModal') && document.getElementById('notesModal').style.display === 'flex') {
+                            renderNotes();
+                        }
+                    }
+                }
+            }, 10000); // Vérification silencieuse toutes les 10 secondes
+        };
+
         // --- SYNCHRONISATION TEMPS RÉEL (SUPABASE REALTIME) ---
         window.setupRealtimeSubscriptions = function() {
             // 1. On nettoie les anciens canaux pour éviter les bugs si le réseau a sauté
