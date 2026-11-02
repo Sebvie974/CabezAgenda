@@ -352,7 +352,7 @@
                     <label>Notes</label>
                     <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..."></textarea>
                 </div>
-                <input type="hidden" id="editApptId"><input type="hidden" id="newApptKine"><input type="hidden" id="newApptDay"><input type="hidden" id="newApptTime">
+                <input type="hidden" id="editApptId"><input type="hidden" id="newApptKine"><input type="hidden" id="newApptDay"><input type="hidden" id="newApptTime"><input type="hidden" id="newApptExactDate">
             </div>
             <div class="modal-actions">
                 <button class="btn-cancel" id="cancelApptBtn">Annuler</button>
@@ -663,7 +663,7 @@
 
         // --- EXPORT / IMPORT JSON ---
         window.exportData = function() {
-            const data = { kinesConfig, mockAppointments, apptTypesConfig };
+            const data = { kinesConfig, appointements, apptTypesConfig };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
             const dlAnchorNode = document.createElement('a');
             dlAnchorNode.setAttribute("href", dataStr);
@@ -679,7 +679,7 @@
                 try {
                     const imported = JSON.parse(e.target.result);
                     if (imported.kinesConfig) kinesConfig = imported.kinesConfig;
-                    if (imported.mockAppointments) mockAppointments = imported.mockAppointments;
+                    if (imported.appointements) appointements = imported.appointements;
                     if (imported.apptTypesConfig) apptTypesConfig = imported.apptTypesConfig;
                     saveData(); alert("Restauration réussie ! Le planning va se recharger."); location.reload();
                 } catch (err) { alert("Erreur lors de la lecture du fichier JSON."); }
@@ -728,7 +728,7 @@
             if(datalist) datalist.innerHTML = ''; 
             if(globalDatalist) globalDatalist.innerHTML = '';
 
-            const allNames = mockAppointments.map(appt => appt.patient).filter(name => name && name !== 'Indisponible' && name !== 'Patient');
+            const allNames = appointements.map(appt => appt.patient).filter(name => name && name !== 'Indisponible' && name !== 'Patient');
             const uniqueNames = [...new Set(allNames)].sort();
             uniqueNames.forEach(name => {
                 const option = document.createElement('option');
@@ -750,7 +750,7 @@
             let foundPhones = [];
             let foundNote = '';
             
-            const patientAppts = mockAppointments.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
+            const patientAppts = appointements.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
             
             if (patientAppts.length > 0) {
                 const apptWithPhone = [...patientAppts].reverse().find(a => a.phones && a.phones.length > 0);
@@ -780,7 +780,7 @@
         window.openPatientHistoryGlobal = function(typedName) {
             if(!typedName) return;
             const searchName = typedName.trim().toLowerCase();
-            const patientAppts = mockAppointments.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
+            const patientAppts = appointements.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
             
             const listEl = document.getElementById('globalPatientHistoryList');
             if(!listEl) return;
@@ -848,7 +848,7 @@
 
         window.openEditModalFromHistory = function(apptId) {
             document.getElementById('patientHistoryGlobalModal').style.display = 'none';
-            const appt = mockAppointments.find(a => a.id === apptId);
+            const appt = appointements.find(a => a.id === apptId);
             if(appt) {
                 // Change la date de fond pour sauter vers le jour du RDV
                 document.getElementById('dateSelect').value = appt.exactDate;
@@ -1270,37 +1270,26 @@
             }
         };
 
-        window.openAddModal = function(kine, date, time) {
-            // Sécurité : on vérifie que l'élément existe avant de lui attribuer une valeur
-            const safeSetValue = (id, value) => {
-                const el = document.getElementById(id);
-                if (el) el.value = value;
-            };
-            const safeSetChecked = (id, isChecked) => {
-                const el = document.getElementById(id);
-                if (el) el.checked = isChecked;
-            };
+        window.openAddModal = function(kine, dayIndex, time, exactDate) {
+            const safeSetValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+            const safeSetChecked = (id, isChecked) => { const el = document.getElementById(id); if (el) el.checked = isChecked; };
 
-            // Réinitialisation des champs cachés
             safeSetValue('editApptId', '');
             safeSetValue('newApptKine', kine);
-            safeSetValue('newApptDay', date);
+            safeSetValue('newApptDay', dayIndex);
             safeSetValue('newApptTime', time);
+            safeSetValue('newApptExactDate', exactDate);
             
-            // Réinitialisation des champs visibles
             safeSetValue('newPatientName', '');
             safeSetValue('newApptNotes', '');
             safeSetValue('newApptRemaining', '');
             
-            // Réinitialisation des cases à cocher
             safeSetChecked('newApptImportant', false);
             safeSetChecked('newApptFirstVisit', false);
             safeSetChecked('newApptLastVisit', false);
             safeSetChecked('newApptCV', false);
 
-            if (kinesConfig && kinesConfig[kine]) {
-                safeSetValue('newApptDuration', kinesConfig[kine].slotDuration || 30);
-            }
+            if (kinesConfig && kinesConfig[kine]) safeSetValue('newApptDuration', kinesConfig[kine].slotDuration || 30);
 
             const phoneCont = document.getElementById('phoneInputsContainer');
             if (phoneCont) phoneCont.innerHTML = '';
@@ -1310,7 +1299,6 @@
 
             const delBtn = document.getElementById('deleteApptBtn');
             if (delBtn) delBtn.style.display = 'none';
-            
             const sameBtn = document.getElementById('addSameSlotBtn');
             if (sameBtn) sameBtn.style.display = 'none';
 
@@ -1319,62 +1307,46 @@
         };
 
         window.openEditModal = function(apptId) {
-            // Sécurité : on récupère la liste sans provoquer d'erreur ReferenceError
             const apptList = (typeof appointments !== 'undefined') ? appointments : (window.appointments || []);
-            
-            // On convertit les ID en chaînes de caractères pour garantir la correspondance
             const appt = apptList.find(a => String(a.id) === String(apptId));
-            
-            if (!appt) {
-                console.error("Erreur : Rendez-vous introuvable en mémoire pour l'ID", apptId);
-                return;
-            }
+            if (!appt) return;
 
-            const safeSetValue = (id, value) => {
-                const el = document.getElementById(id);
-                if (el) el.value = value;
-            };
-            const safeSetChecked = (id, isChecked) => {
-                const el = document.getElementById(id);
-                if (el) el.checked = isChecked;
-            };
+            const safeSetValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+            const safeSetChecked = (id, isChecked) => { const el = document.getElementById(id); if (el) el.checked = isChecked; };
 
+            // On utilise les vrais noms de variables Supabase
             safeSetValue('editApptId', appt.id);
-            safeSetValue('newApptKine', appt.kine);
-            safeSetValue('newApptDay', appt.date);
-            safeSetValue('newApptTime', appt.time);
+            safeSetValue('newApptKine', appt.kineId);
+            safeSetValue('newApptDay', appt.dayIndex);
+            safeSetValue('newApptExactDate', appt.exactDate);
+            safeSetValue('newApptTime', appt.timeStr);
             
             safeSetValue('newPatientName', appt.patient || '');
-            safeSetValue('newApptNotes', appt.notes || '');
-            safeSetValue('newApptRemaining', appt.remaining || '');
+            safeSetValue('newApptNotes', appt.note || '');
+            safeSetValue('newApptRemaining', appt.remainingSessions || '');
             safeSetValue('newApptDuration', appt.duration || 30);
             
             const typeSelect = document.getElementById('newApptType');
             if (typeSelect) {
-                const optionExists = Array.from(typeSelect.options).some(opt => opt.value === appt.type);
-                if (!optionExists && appt.type) {
-                    typeSelect.innerHTML += `<option value="${appt.type}">${appt.type}</option>`;
-                }
-                typeSelect.value = appt.type || '';
+                const optionExists = Array.from(typeSelect.options).some(opt => opt.value === appt.apptType);
+                if (!optionExists && appt.apptType) typeSelect.innerHTML += `<option value="${appt.apptType}">${appt.apptType}</option>`;
+                typeSelect.value = appt.apptType || '';
             }
 
-            safeSetChecked('newApptImportant', appt.important || false);
-            safeSetChecked('newApptFirstVisit', appt.firstVisit || false);
-            safeSetChecked('newApptLastVisit', appt.lastVisit || false);
-            safeSetChecked('newApptCV', appt.cv || false);
+            safeSetChecked('newApptImportant', appt.isImportant || false);
+            safeSetChecked('newApptFirstVisit', appt.isFirstVisit || false);
+            safeSetChecked('newApptLastVisit', appt.isLastVisit || false);
+            safeSetChecked('newApptCV', appt.isCV || false);
 
             const title = document.getElementById('modalTitle');
             if (title) title.innerText = 'Modifier le Rendez-vous';
 
             const delBtn = document.getElementById('deleteApptBtn');
             if (delBtn) delBtn.style.display = 'inline-block';
-            
             const sameBtn = document.getElementById('addSameSlotBtn');
             if (sameBtn) sameBtn.style.display = 'inline-block';
 
-            if (typeof window.fillPatientData === 'function' && appt.patient) {
-                window.fillPatientData(appt.patient);
-            }
+            if (typeof window.fillPatientData === 'function' && appt.patient) window.fillPatientData(appt.patient);
 
             const modal = document.getElementById('addApptModal');
             if (modal) modal.style.display = 'flex';
@@ -1396,7 +1368,7 @@
                 await supabaseClient.from('appointments').delete().eq('id', id);
                 
                 // Mise à jour de l'affichage local
-                mockAppointments = mockAppointments.filter(a => a.id !== id);
+                appointements = appointements.filter(a => a.id !== id);
                 updatePatientSuggestions(); 
                 document.getElementById('addApptModal').style.display = 'none'; 
                 renderCalendar();
@@ -1404,7 +1376,7 @@
         };
 
         window.saveUnavailableSlot = function() {
-            mockAppointments.push({
+            appointements.push({
                 id: Date.now(), kineId: document.getElementById('newApptKine').value, dayIndex: parseInt(document.getElementById('newApptDay').value),
                 exactDate: document.getElementById('newApptExactDate').value,
                 timeStr: document.getElementById('newApptTime').value, duration: parseInt(document.getElementById('newApptDuration').value),
@@ -1522,8 +1494,8 @@
             if (editId) {
                 baseApptData.id = parseInt(editId);
                 baseApptData.exactDate = baseDate;
-                const index = mockAppointments.findIndex(a => a.id === baseApptData.id);
-                if (index !== -1) mockAppointments[index] = baseApptData;
+                const index = appointements.findIndex(a => a.id === baseApptData.id);
+                if (index !== -1) appointements[index] = baseApptData;
             } else {
                 const dateParts = baseDate ? baseDate.split('-') : [];
                 const startDateObj = baseDate ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2]) : new Date();
@@ -1560,7 +1532,7 @@
                         }
                         if (iterationCount > 0) newAppt.isFirstVisit = false;
                         
-                        mockAppointments.push(newAppt);
+                        appointements.push(newAppt);
                         iterationCount++;
                     }
                 }
@@ -1568,7 +1540,7 @@
 
             // NOUVEAU : Synchronisation globale du numéro de téléphone ET des notes au patient !
             if (patientNameStr !== 'Indisponible' && patientNameStr !== 'Patient') {
-                mockAppointments.forEach(a => {
+                appointements.forEach(a => {
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
                         a.phones = [...phonesArray];
                         a.note = currentNote;
@@ -1695,12 +1667,12 @@
                 const snappedMins = Math.floor(totalMins / config.slotDuration) * config.slotDuration;
                 const newTimeStr = `${(Math.floor(snappedMins / 60) + START_HOUR).toString().padStart(2,'0')}:${(snappedMins % 60).toString().padStart(2, '0')}`;
 
-                const index = mockAppointments.findIndex(a => a.id === apptId);
+                const index = appointements.findIndex(a => a.id === apptId);
                 if (index !== -1) {
-                    mockAppointments[index].kineId = kineId;
-                    mockAppointments[index].dayIndex = dayIndex;
-                    mockAppointments[index].exactDate = exactDate; 
-                    mockAppointments[index].timeStr = newTimeStr;
+                    appointements[index].kineId = kineId;
+                    appointements[index].dayIndex = dayIndex;
+                    appointements[index].exactDate = exactDate; 
+                    appointements[index].timeStr = newTimeStr;
                     saveData(); renderCalendar();
                 }
             });
@@ -1723,7 +1695,7 @@
             drawBlock(daySchedule.pauseStart, daySchedule.pauseEnd);
             if (daySchedule.end < END_HOUR) drawBlock(daySchedule.end, END_HOUR);
 
-            const dailyAppts = mockAppointments.filter(a => a.kineId === kineId && (a.exactDate === exactDate || (!a.exactDate && a.dayIndex === dayIndex)));
+            const dailyAppts = appointements.filter(a => a.kineId === kineId && (a.exactDate === exactDate || (!a.exactDate && a.dayIndex === dayIndex)));
             const timeGroups = {};
             dailyAppts.forEach(appt => {
                 if (!timeGroups[appt.timeStr]) timeGroups[appt.timeStr] = [];
@@ -1756,7 +1728,7 @@
                             e.stopPropagation(); 
                             if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
                                 await supabaseClient.from('appointments').delete().eq('id', appt.id);
-                                mockAppointments = mockAppointments.filter(a => a.id !== appt.id);
+                                appointements = appointements.filter(a => a.id !== appt.id);
                                 saveData(); updatePatientSuggestions(); renderCalendar();
                             }
                         });
@@ -1849,8 +1821,8 @@
                             e.stopPropagation(); 
                             if (window.isSecretariatMode) {
                                 appt.vegaPointed = !appt.vegaPointed;
-                                const idx = mockAppointments.findIndex(a => a.id === appt.id);
-                                if (idx !== -1) mockAppointments[idx].vegaPointed = appt.vegaPointed;
+                                const idx = appointements.findIndex(a => a.id === appt.id);
+                                if (idx !== -1) appointements[idx].vegaPointed = appt.vegaPointed;
                                 saveData();
                                 renderCalendar();
                             } else {
@@ -2047,19 +2019,16 @@
                 document.getElementById('addApptModal').style.display = 'none';
             });
             document.getElementById('confirmApptBtn')?.addEventListener('click', () => {
-                if (typeof saveAppointment === 'function') saveAppointment();
-                else if (typeof saveAppt === 'function') saveAppt();
+                if (typeof saveNewAppointment === 'function') saveNewAppointment();
             });
             document.getElementById('blockSlotBtn')?.addEventListener('click', () => {
-                if (typeof blockSlot === 'function') blockSlot();
-                else if (typeof blockAppointment === 'function') blockAppointment();
+                if (typeof saveUnavailableSlot === 'function') saveUnavailableSlot();
             });
             document.getElementById('deleteApptBtn')?.addEventListener('click', () => {
                 if (typeof deleteAppointment === 'function') deleteAppointment();
-                else if (typeof deleteAppt === 'function') deleteAppt();
             });
             document.getElementById('addSameSlotBtn')?.addEventListener('click', () => {
-                if (typeof addSameSlot === 'function') addSameSlot();
+                if (typeof triggerAddSameSlot === 'function') triggerAddSameSlot();
             });
         }
 
