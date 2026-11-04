@@ -284,6 +284,42 @@
                 font-size: 0.7rem;
             }
         }
+
+        /* --- CORRECTION BANDEAU SMARTPHONE --- */
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 12px !important;
+                height: auto !important;
+                padding: 10px !important;
+            }
+            .toolbar > div {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                justify-content: space-between !important;
+                align-items: flex-end !important;
+                width: 100% !important;
+                gap: 8px !important;
+            }
+            .toolbar .control-group {
+                flex: 1;
+                min-width: 140px;
+                margin: 0 !important;
+            }
+            .toolbar input, .toolbar select {
+                width: 100% !important;
+            }
+            /* Ligne des boutons d'action alignée horizontalement */
+            .toolbar button {
+                flex-grow: 1;
+                padding: 8px 4px !important;
+                font-size: 0.8rem !important;
+                margin: 0 !important;
+                white-space: nowrap;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1976,6 +2012,7 @@
                                 textDeco = 'line-through';
                                 if (!isPast) boxOpacity = '0.5';
                             } else if (appt.status === 'cancelled_24h') {
+                                textDeco = 'line-through'; // <-- Le nom sera désormais barré
                                 prefix += `<span style="background-color: #718096; color: white; padding: 0 4px; border-radius: 3px; font-size: 0.6rem; font-weight: bold; margin-right: 4px;" title="Annulé 24h avant">24</span>`;
                                 if (!isPast) boxOpacity = '0.5';
                             }
