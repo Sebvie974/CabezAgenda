@@ -346,6 +346,19 @@
         </div>
     </div>
 
+    <!-- MODALE HISTORIQUE PATIENT -->
+        <div class="modal-overlay" id="patientHistoryModal" style="display: none;">
+            <div class="modal-content" style="width: 500px; max-width: 95vw; padding: 20px;">
+                <h3 id="patientHistoryTitle" style="margin-bottom: 15px;">Historique du patient</h3>
+                <div id="patientHistoryContent" style="max-height: 60vh; overflow-y: auto; margin-bottom: 15px;">
+                    <!-- Les anciens RDV s'afficheront ici -->
+                </div>
+                <div class="modal-actions" style="justify-content: flex-end;">
+                    <button class="btn-cancel" onclick="document.getElementById('patientHistoryModal').style.display='none'">Fermer</button>
+                </div>
+            </div>
+        </div>
+
     <!-- MODALE : AJOUT / MODIFICATION RDV -->
     <div class="modal-overlay" id="addApptModal">
         <div class="modal-content" style="width: 480px; max-width: 95vw; padding: 15px 20px;">
@@ -595,7 +608,7 @@
                     <button class="btn-cancel" id="prevDateBtn" style="padding: 0 10px;">&lt;</button>
                     <input type="date" id="dateSelect">
                     <button class="btn-cancel" id="nextDateBtn" style="padding: 0 10px;">&gt;</button>
-                    <button class="btn-save" id="todayBtn" style="padding: 0 10px; background-color: #4a5568;">Aujourd'hui</button>
+                    <button class="btn-save" id="todayBtn" onclick="const d = document.getElementById('dateSelect'); if(d) { const now = new Date(); d.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0'); d.dispatchEvent(new Event('change')); }" style="padding: 0 10px; background-color: #4a5568;">Aujourd'hui</button>
                 </div>
             </div>
             
