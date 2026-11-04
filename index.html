@@ -602,7 +602,7 @@
             <!-- NOUVEAU : Barre de recherche globale de patient -->
             <div class="control-group" style="width: auto;">
                 <label>Rechercher un patient</label>
-                <input type="text" id="globalPatientSearch" list="globalPatientsList" placeholder="Ex: Jean Dupont" autocomplete="off" style="width: 180px;">
+                <input type="text" id="globalPatientSearch" list="globalPatientsList" placeholder="Ex: Jean Dupont" onchange="if(this.value) { window.openPatientHistoryGlobal(this.value); this.value=''; }">
                 <datalist id="globalPatientsList"></datalist>
             </div>
 
@@ -2079,17 +2079,6 @@
             return col;
         }
 
-        // Répare le bouton "Aller à" des historiques
-        window.goToDate = function(dateStr) {
-            const dateInput = document.getElementById('dateSelect');
-            if(dateInput) {
-                dateInput.value = dateStr;
-                dateInput.dispatchEvent(new Event('change')); // Force le rafraîchissement
-            }
-            const histMod = document.getElementById('patientHistoryModal');
-            if(histMod) histMod.style.display = 'none';
-        };
-
         // Restaure la sauvegarde manuelle
         window.exportData = function() {
             const dataToExport = {
@@ -2407,45 +2396,7 @@
             }
         };
 
-        // 2. Mise à jour de l'affichage de l'historique pour inclure l'ID
-        window.openPatientHistoryGlobal = function(patientName) {
-            if (!patientName) return;
-            const histMod = document.getElementById('patientHistoryModal');
-            const histContent = document.getElementById('patientHistoryContent');
-            const histTitle = document.getElementById('patientHistoryTitle');
-            
-            if (!histMod || !histContent || !histTitle) return;
-            histTitle.innerText = "Historique : " + patientName;
-            
-            const patAppts = appointments.filter(a => a.patient && a.patient.toLowerCase() === patientName.toLowerCase())
-                                         .sort((a, b) => new Date(b.exactDate) - new Date(a.exactDate));
-            
-            if (patAppts.length === 0) {
-                histContent.innerHTML = "<p style='padding: 10px;'>Aucun rendez-vous trouvé.</p>";
-            } else {
-                let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 5px;">';
-                patAppts.forEach(appt => {
-                    const kineName = kinesConfig[appt.kineId] ? kinesConfig[appt.kineId].name : 'Inconnu';
-                    const dParts = appt.exactDate.split('-');
-                    const frDate = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : appt.exactDate;
                     
-                    html += `
-                    <div style="border: 1px solid #e2e8f0; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; background: white;">
-                        <div>
-                            <div style="font-weight: bold; color: #2d3748;">${frDate} à ${appt.timeStr}</div>
-                            <div style="font-size: 0.85rem; color: #4a5568;">Avec ${kineName}</div>
-                        </div>
-                        <!-- NOUVEAU : On transmet appt.id dans le bouton -->
-                        <button class="btn-save" onclick="goToDate('${appt.exactDate}', ${appt.id})" style="padding: 6px 12px; font-size: 0.85rem;">Aller à</button>
-                    </div>`;
-                });
-                html += '</div>';
-                histContent.innerHTML = html;
-            }
-            histMod.style.display = 'flex';
-        };
-
-              
         // --- ANTI-VEILLE POUR SMARTPHONES (PWA) ---
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible') {
@@ -2492,6 +2443,92 @@
                 navigator.serviceWorker.register('sw.js').catch(err => console.log('Erreur SW', err));
             });
         }
+
+        // --- BLOC DE RÉPARATION : NAVIGATION ET RECHERCHE ---
+
+        // 1. Fonction Aujourd'hui 100% garantie
+        window.goToToday = function() {
+            const dateInput = document.getElementById('dateSelect');
+            if (dateInput) {
+                const now = new Date();
+                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                
+                if (window.innerWidth > 768 && typeof snapToMonday === 'function') {
+                    dateInput.value = snapToMonday(todayStr);
+                } else {
+                    dateInput.value = todayStr;
+                }
+                if (typeof renderCalendar === 'function') renderCalendar();
+            }
+        };
+
+        // 2. Fonction Aller à (qui ouvre bien la fiche du RDV)
+        window.goToDate = function(dateStr, apptId) {
+            const dateInput = document.getElementById('dateSelect');
+            if(dateInput) {
+                if (window.innerWidth > 768 && typeof snapToMonday === 'function') {
+                    dateInput.value = snapToMonday(dateStr);
+                } else {
+                    dateInput.value = dateStr;
+                }
+                if (typeof renderCalendar === 'function') renderCalendar();
+            }
+
+            // Tente de fermer la modale d'historique (couvre plusieurs noms possibles)
+            const histMod1 = document.getElementById('patientHistoryModal');
+            if (histMod1) histMod1.style.display = 'none';
+            const histMod2 = document.getElementById('historyModal');
+            if (histMod2) histMod2.style.display = 'none';
+
+            // Ouvre la fenêtre du RDV après un petit délai pour laisser l'agenda se dessiner
+            if (apptId) {
+                setTimeout(() => {
+                    if (typeof openEditModal === 'function') openEditModal(apptId);
+                }, 150); 
+            }
+        };
+
+        // 3. Fonction Historique robuste
+        window.openPatientHistoryGlobal = function(patientName) {
+            if (!patientName) return;
+
+            // Tolérance sur les IDs pour éviter le silence radio
+            const histMod = document.getElementById('patientHistoryModal') || document.getElementById('historyModal');
+            const histContent = document.getElementById('patientHistoryContent') || document.getElementById('historyContent');
+            const histTitle = document.getElementById('patientHistoryTitle') || document.getElementById('historyTitle');
+
+            if (!histMod || !histContent || !histTitle) {
+                alert("Impossible d'afficher l'historique : la fenêtre HTML est introuvable.");
+                return;
+            }
+
+            histTitle.innerText = "Historique : " + patientName;
+            const patAppts = appointments.filter(a => a.patient && a.patient.toLowerCase() === patientName.toLowerCase())
+                                         .sort((a, b) => new Date(b.exactDate) - new Date(a.exactDate));
+
+            if (patAppts.length === 0) {
+                histContent.innerHTML = "<p style='padding: 10px;'>Aucun rendez-vous trouvé.</p>";
+            } else {
+                let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 5px;">';
+                patAppts.forEach(appt => {
+                    const kineName = kinesConfig[appt.kineId] ? kinesConfig[appt.kineId].name : 'Inconnu';
+                    const dParts = appt.exactDate.split('-');
+                    const frDate = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : appt.exactDate;
+
+                    html += `
+                    <div style="border: 1px solid #e2e8f0; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; background: white;">
+                        <div>
+                            <div style="font-weight: bold; color: #2d3748;">${frDate} à ${appt.timeStr}</div>
+                            <div style="font-size: 0.85rem; color: #4a5568;">Avec ${kineName}</div>
+                        </div>
+                        <button class="btn-save" onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 6px 12px; font-size: 0.85rem;">Aller à</button>
+                    </div>`;
+                });
+                html += '</div>';
+                histContent.innerHTML = html;
+            }
+            histMod.style.display = 'flex';
+        };
     </script>
 </body>
 </html>
