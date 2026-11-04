@@ -1284,8 +1284,8 @@
         };
 
         window.openAddModal = function(kine, dayIndex, time, exactDate) {
-            // 1. On génère les types de RDV autorisés pour ce kiné avant d'afficher
             if (typeof updateTypeSelectLabels === 'function') updateTypeSelectLabels(kine);
+            if (typeof updateStatusSelectLabels === 'function') updateStatusSelectLabels(); // Génère les statuts
 
             const safeSetValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
             const safeSetChecked = (id, isChecked) => { const el = document.getElementById(id); if (el) el.checked = isChecked; };
@@ -1299,6 +1299,7 @@
             safeSetValue('newPatientName', '');
             safeSetValue('newApptNotes', '');
             safeSetValue('newApptRemaining', '');
+            safeSetValue('newApptStatus', ''); // Réinitialise le statut par défaut
             
             safeSetChecked('newApptImportant', false);
             safeSetChecked('newApptFirstVisit', false);
@@ -1320,7 +1321,6 @@
             const sameBtn = document.getElementById('addSameSlotBtn');
             if (sameBtn) sameBtn.style.display = 'none';
             
-            // 2. On affiche le bouton "Bloquer" à la création
             const blockBtn = document.getElementById('blockSlotBtn');
             if (blockBtn) blockBtn.style.display = 'inline-block';
 
@@ -1333,8 +1333,8 @@
             const appt = apptList.find(a => String(a.id) === String(apptId));
             if (!appt) return;
 
-            // 1. On génère les types de RDV du kiné pour pré-remplir le menu
             if (typeof updateTypeSelectLabels === 'function') updateTypeSelectLabels(appt.kineId);
+            if (typeof updateStatusSelectLabels === 'function') updateStatusSelectLabels(); // Génère les statuts
 
             const safeSetValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
             const safeSetChecked = (id, isChecked) => { const el = document.getElementById(id); if (el) el.checked = isChecked; };
@@ -1349,6 +1349,7 @@
             safeSetValue('newApptNotes', appt.note || '');
             safeSetValue('newApptRemaining', appt.remainingSessions || '');
             safeSetValue('newApptDuration', appt.duration || 30);
+            safeSetValue('newApptStatus', appt.status || ''); // Recharge le statut mémorisé
             
             const typeSelect = document.getElementById('newApptType');
             if (typeSelect) {
@@ -1372,7 +1373,6 @@
             const sameBtn = document.getElementById('addSameSlotBtn');
             if (sameBtn) sameBtn.style.display = 'inline-block';
             
-            // 2. On cache le bouton "Bloquer" car il est inutile en mode édition
             const blockBtn = document.getElementById('blockSlotBtn');
             if (blockBtn) blockBtn.style.display = 'none';
 
