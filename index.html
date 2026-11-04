@@ -1188,12 +1188,20 @@
                 if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
             });
 
-            // Bouton "Aujourd'hui"
+            // Bouton "Aujourd'hui" corrigé (Heure locale + Forçage de l'affichage)
             document.getElementById('todayBtn')?.addEventListener('click', () => {
                 const dateInput = document.getElementById('dateSelect');
                 if (dateInput) {
-                    dateInput.value = new Date().toISOString().split('T')[0];
-                    dateInput.dispatchEvent(new Event('change')); 
+                    const now = new Date();
+                    // Génère la date au format local AAAA-MM-JJ
+                    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                    
+                    if (window.innerWidth > 768 && typeof snapToMonday === 'function') {
+                        dateInput.value = snapToMonday(todayStr);
+                    } else {
+                        dateInput.value = todayStr;
+                    }
+                    renderCalendar(); // Force le dessin immédiat de la grille
                 }
             });
 
@@ -2371,6 +2379,70 @@
                       console.log('📡 Connexion Temps Réel Supabase : ACTIVE');
                   }
               });
+        };
+
+        // 1. Fonction Aller à (Modifiée pour ouvrir la fiche)
+        window.goToDate = function(dateStr, apptId) {
+            const dateInput = document.getElementById('dateSelect');
+            if(dateInput) {
+                if (window.innerWidth > 768 && typeof snapToMonday === 'function') {
+                    dateInput.value = snapToMonday(dateStr);
+                } else {
+                    dateInput.value = dateStr;
+                }
+            }
+            
+            // Ferme la modale d'historique
+            const histMod = document.getElementById('patientHistoryModal');
+            if(histMod) histMod.style.display = 'none';
+            
+            // Met à jour la grille pour afficher la bonne semaine/le bon jour
+            if (typeof renderCalendar === 'function') renderCalendar();
+            
+            // Si on a cliqué sur un RDV précis, on l'ouvre après un très bref délai
+            if (apptId) {
+                setTimeout(() => {
+                    if (typeof openEditModal === 'function') openEditModal(apptId);
+                }, 100);
+            }
+        };
+
+        // 2. Mise à jour de l'affichage de l'historique pour inclure l'ID
+        window.openPatientHistoryGlobal = function(patientName) {
+            if (!patientName) return;
+            const histMod = document.getElementById('patientHistoryModal');
+            const histContent = document.getElementById('patientHistoryContent');
+            const histTitle = document.getElementById('patientHistoryTitle');
+            
+            if (!histMod || !histContent || !histTitle) return;
+            histTitle.innerText = "Historique : " + patientName;
+            
+            const patAppts = appointments.filter(a => a.patient && a.patient.toLowerCase() === patientName.toLowerCase())
+                                         .sort((a, b) => new Date(b.exactDate) - new Date(a.exactDate));
+            
+            if (patAppts.length === 0) {
+                histContent.innerHTML = "<p style='padding: 10px;'>Aucun rendez-vous trouvé.</p>";
+            } else {
+                let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 5px;">';
+                patAppts.forEach(appt => {
+                    const kineName = kinesConfig[appt.kineId] ? kinesConfig[appt.kineId].name : 'Inconnu';
+                    const dParts = appt.exactDate.split('-');
+                    const frDate = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : appt.exactDate;
+                    
+                    html += `
+                    <div style="border: 1px solid #e2e8f0; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; background: white;">
+                        <div>
+                            <div style="font-weight: bold; color: #2d3748;">${frDate} à ${appt.timeStr}</div>
+                            <div style="font-size: 0.85rem; color: #4a5568;">Avec ${kineName}</div>
+                        </div>
+                        <!-- NOUVEAU : On transmet appt.id dans le bouton -->
+                        <button class="btn-save" onclick="goToDate('${appt.exactDate}', ${appt.id})" style="padding: 6px 12px; font-size: 0.85rem;">Aller à</button>
+                    </div>`;
+                });
+                html += '</div>';
+                histContent.innerHTML = html;
+            }
+            histMod.style.display = 'flex';
         };
 
               
