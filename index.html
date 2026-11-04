@@ -2501,11 +2501,10 @@
             }
         };
 
-        // 3. Fonction Historique robuste
+        // 3. Fonction Historique (Filtrée sur l'avenir et Colorisée)
         window.openPatientHistoryGlobal = function(patientName) {
             if (!patientName) return;
 
-            // Tolérance sur les IDs pour éviter le silence radio
             const histMod = document.getElementById('patientHistoryModal') || document.getElementById('historyModal');
             const histContent = document.getElementById('patientHistoryContent') || document.getElementById('historyContent');
             const histTitle = document.getElementById('patientHistoryTitle') || document.getElementById('historyTitle');
@@ -2515,26 +2514,42 @@
                 return;
             }
 
-            histTitle.innerText = "Historique : " + patientName;
-            const patAppts = appointments.filter(a => a.patient && a.patient.toLowerCase() === patientName.toLowerCase())
-                                         .sort((a, b) => new Date(b.exactDate) - new Date(a.exactDate));
+            histTitle.innerText = "Rendez-vous à venir : " + patientName;
+
+            // Calcul de la date du jour en heure locale (ex: 2026-11-04)
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            // Filtre : uniquement les RDV à partir d'aujourd'hui, triés du plus proche au plus éloigné
+            const patAppts = appointments.filter(a => 
+                a.patient && 
+                a.patient.toLowerCase() === patientName.toLowerCase() &&
+                a.exactDate >= todayStr // Ignore le passé
+            ).sort((a, b) => {
+                const dateDiff = new Date(a.exactDate) - new Date(b.exactDate);
+                if (dateDiff === 0) return a.timeStr.localeCompare(b.timeStr); // Si même jour, tri par heure
+                return dateDiff;
+            });
 
             if (patAppts.length === 0) {
-                histContent.innerHTML = "<p style='padding: 10px;'>Aucun rendez-vous trouvé.</p>";
+                histContent.innerHTML = "<p style='padding: 10px; color: #718096;'>Aucun rendez-vous à venir trouvé pour ce patient.</p>";
             } else {
                 let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 5px;">';
                 patAppts.forEach(appt => {
                     const kineName = kinesConfig[appt.kineId] ? kinesConfig[appt.kineId].name : 'Inconnu';
+                    // Récupération de la couleur du kiné (Gris par défaut si introuvable)
+                    const kineColor = kinesConfig[appt.kineId] ? kinesConfig[appt.kineId].color : '#cbd5e0';
+                    
                     const dParts = appt.exactDate.split('-');
                     const frDate = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : appt.exactDate;
 
                     html += `
-                    <div style="border: 1px solid #e2e8f0; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; background: white;">
+                    <div style="border-left: 6px solid ${kineColor}; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                         <div>
-                            <div style="font-weight: bold; color: #2d3748;">${frDate} à ${appt.timeStr}</div>
-                            <div style="font-size: 0.85rem; color: #4a5568;">Avec ${kineName}</div>
+                            <div style="font-weight: bold; color: #2d3748; font-size: 1.05rem;">${frDate} à ${appt.timeStr}</div>
+                            <div style="font-size: 0.9rem; color: #4a5568; margin-top: 3px;">Avec ${kineName}</div>
                         </div>
-                        <button class="btn-save" onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 6px 12px; font-size: 0.85rem;">Aller à</button>
+                        <button class="btn-save" onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 8px 12px; font-size: 0.85rem; background-color: ${kineColor}; color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Aller à</button>
                     </div>`;
                 });
                 html += '</div>';
