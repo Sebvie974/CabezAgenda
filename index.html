@@ -302,87 +302,95 @@
 
     <!-- MODALE : AJOUT / MODIFICATION RDV -->
     <div class="modal-overlay" id="addApptModal">
-        <div class="modal-content" style="width: 320px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <div class="modal-content" style="width: 480px; max-width: 95vw; padding: 15px 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 id="modalTitle">Nouveau Rendez-vous</h3>
-                <!-- BOUTON AJOUT MÊME HEURE DÉPLACÉ EN HAUT -->
                 <button class="btn-cancel" id="addSameSlotBtn" style="border-color: #3182ce; color: #3182ce; display: none; padding: 0 10px; font-weight: bold; font-size: 1.4rem; height: 30px; line-height: 1;" title="Ajouter un autre patient sur ce même créneau horaire">+</button>
             </div>
-            <div class="modal-body">
+            
+            <div class="modal-body" style="gap: 10px; margin-bottom: 15px;">
+                <!-- Ligne 1 : Patient -->
                 <div class="control-group">
                     <label>Patient / Motif</label>
                     <input type="text" id="newPatientName" list="patientsList" placeholder="Ex: Jean Dupont" autocomplete="off">
                     <datalist id="patientsList"></datalist>
                 </div>
 
-                <div class="control-group">
-                    <label>Statut de la séance</label>
-                    <select id="newApptStatus"></select>
-                </div>
-                
-                <div class="options-box">
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="checkbox" id="newApptImportant" style="width: 16px; height: 16px; cursor: pointer;">
-                        <label for="newApptImportant" style="margin: 0; cursor: pointer; color: #fc8181; font-weight: bold; text-transform: none;">Important</label>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="checkbox" id="newApptFirstVisit" style="width: 16px; height: 16px; cursor: pointer;">
-                        <label for="newApptFirstVisit" style="margin: 0; cursor: pointer; color: #63b3ed; text-transform: none;">1er RDV</label>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="checkbox" id="newApptLastVisit" style="width: 16px; height: 16px; cursor: pointer;">
-                        <label for="newApptLastVisit" style="margin: 0; cursor: pointer; color: #f6ad55; text-transform: none;">Dernier</label>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="checkbox" id="newApptCV" style="width: 16px; height: 16px; cursor: pointer;">
-                        <label for="newApptCV" style="margin: 0; cursor: pointer; color: #68d391; font-weight: bold; text-transform: none;">CV 💳</label>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 5px;">
-                        <label for="newApptRemaining" style="margin: 0; text-transform: none; color: #a0aec0;">Séances restantes :</label>
-                        <input type="number" id="newApptRemaining" style="width: 70px; height: 30px; padding: 2px 8px;" min="0">
-                    </div>
-                </div>
-
-                <div class="control-group">
-                    <label>Type de RDV</label>
-                    <select id="newApptType">
-                        <!-- Rempli dynamiquement -->
-                    </select>
-                </div>
-
-                <div class="control-group">
-                    <label>Téléphone(s)</label>
-                    <div id="phoneInputsContainer" style="display: flex; flex-direction: column; gap: 5px;"></div>
-                </div>
-                <div class="control-group">
-                    <label>Durée (min)</label>
-                    <input type="number" id="newApptDuration" step="10">
-                </div>
-                <div class="control-group">
-                    <label>Notes</label>
-                    <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..."></textarea>
-                </div>
-                <!-- Champs visibles pour déplacer le RDV -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                <!-- Ligne 2 : Date, Heure, Praticien -->
+                <div style="display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; gap: 10px;">
                     <div class="control-group">
                         <label>Date du RDV</label>
-                        <!-- Le onchange met à jour le jour de la semaine en arrière-plan -->
                         <input type="date" id="newApptExactDate" onchange="updateDayIndexFromDate()">
                     </div>
                     <div class="control-group">
                         <label>Heure</label>
                         <input type="time" id="newApptTime">
                     </div>
-                </div>
-                <div class="control-group" style="margin-top: 10px;">
-                    <label>Praticien</label>
-                    <select id="newApptKine"></select>
+                    <div class="control-group">
+                        <label>Praticien</label>
+                        <select id="newApptKine"></select>
+                    </div>
                 </div>
 
-                <!-- On garde uniquement l'ID et l'index du jour en cache -->
-                <input type="hidden" id="editApptId">
-                <input type="hidden" id="newApptDay">
+                <!-- Ligne 3 : Type et Statut -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Type de RDV</label>
+                        <select id="newApptType"></select>
+                    </div>
+                    <div class="control-group">
+                        <label>Statut de la séance</label>
+                        <select id="newApptStatus"></select>
+                    </div>
+                </div>
+
+                <!-- Ligne 4 : Téléphone et Durée -->
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Téléphone(s)</label>
+                        <div id="phoneInputsContainer" style="display: flex; flex-direction: column; gap: 5px;"></div>
+                    </div>
+                    <div class="control-group">
+                        <label>Durée (min)</label>
+                        <input type="number" id="newApptDuration" step="10">
+                    </div>
+                </div>
+
+                <!-- Options sous forme compacte -->
+                <div class="options-box" style="margin-top: 0; padding: 8px; gap: 8px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px; width: 100%;">
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="checkbox" id="newApptImportant" style="width: 15px; height: 15px; cursor: pointer;">
+                            <label for="newApptImportant" style="margin: 0; cursor: pointer; color: #fc8181; font-weight: bold; text-transform: none;">Important</label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="checkbox" id="newApptFirstVisit" style="width: 15px; height: 15px; cursor: pointer;">
+                            <label for="newApptFirstVisit" style="margin: 0; cursor: pointer; color: #63b3ed; text-transform: none;">1er RDV</label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="checkbox" id="newApptLastVisit" style="width: 15px; height: 15px; cursor: pointer;">
+                            <label for="newApptLastVisit" style="margin: 0; cursor: pointer; color: #f6ad55; text-transform: none;">Dernier</label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="checkbox" id="newApptCV" style="width: 15px; height: 15px; cursor: pointer;">
+                            <label for="newApptCV" style="margin: 0; cursor: pointer; color: #68d391; font-weight: bold; text-transform: none;">CV 💳</label>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                        <label for="newApptRemaining" style="margin: 0; text-transform: none; color: #a0aec0;">Séances restantes :</label>
+                        <input type="number" id="newApptRemaining" style="width: 60px; height: 26px; padding: 2px 6px;" min="0">
+                    </div>
+                </div>
+
+                <!-- Notes réduites en hauteur -->
+                <div class="control-group">
+                    <label>Notes</label>
+                    <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..." style="min-height: 40px; height: 45px;"></textarea>
+                </div>
+                
+                <input type="hidden" id="editApptId"><input type="hidden" id="newApptDay">
             </div>
+            
             <div class="modal-actions">
                 <button class="btn-cancel" id="cancelApptBtn">Annuler</button>
                 <button class="btn-cancel" id="deleteApptBtn" style="border-color: #e53e3e; color: #e53e3e; display: none;">Supprimer</button>
@@ -513,6 +521,7 @@
                     <button class="btn-cancel" id="prevDateBtn" style="padding: 0 10px;">&lt;</button>
                     <input type="date" id="dateSelect">
                     <button class="btn-cancel" id="nextDateBtn" style="padding: 0 10px;">&gt;</button>
+                    <button class="btn-save" id="todayBtn" style="padding: 0 10px; background-color: #4a5568;">Aujourd'hui</button>
                 </div>
             </div>
             
@@ -1016,7 +1025,16 @@
             }
             
             await loadDataFromSupabase(); 
-            setupRealtimeSubscriptions(); // NOUVEAU : Lance l'écoute en temps réel
+            
+            // Démarrage de la synchronisation silencieuse anti-coupure (Polling)
+            if (typeof startAutoSync === 'function') {
+                lastSyncDataHash = JSON.stringify(appointments) + JSON.stringify(cabinetNotes) + JSON.stringify(kinesConfig);
+                startAutoSync(); 
+            }
+            
+            if (typeof setupRealtimeSubscriptions === 'function') {
+                setupRealtimeSubscriptions(); 
+            }
             
             updateKineSelects(); 
             updatePatientSuggestions();
@@ -1029,7 +1047,6 @@
             pFilter?.addEventListener('change', renderCalendar);
             
             dateInput?.addEventListener('change', (e) => {
-                // Recalcule le Lundi à chaque changement manuel de date sur PC
                 if (window.innerWidth > 768) {
                     e.target.value = snapToMonday(e.target.value);
                 }
@@ -1097,10 +1114,38 @@
                 if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
             });
 
+            // Bouton "Aujourd'hui"
+            document.getElementById('todayBtn')?.addEventListener('click', () => {
+                if (dateInput) {
+                    dateInput.value = new Date().toISOString().split('T')[0];
+                    if (window.innerWidth > 768) {
+                        dateInput.value = snapToMonday(dateInput.value);
+                    }
+                    renderCalendar();
+                }
+            });
+
             window.addEventListener('resize', () => {
                 if (window.innerWidth <= 768 && pFilter && pFilter.value === 'all') pFilter.value = Object.keys(kinesConfig)[0];
                 if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
                 renderCalendar();
+            });
+
+            // --- RECONNEXION DES BOUTONS DE LA MODALE RDV ---
+            document.getElementById('cancelApptBtn')?.addEventListener('click', () => {
+                document.getElementById('addApptModal').style.display = 'none';
+            });
+            document.getElementById('confirmApptBtn')?.addEventListener('click', () => {
+                if (typeof saveNewAppointment === 'function') saveNewAppointment();
+            });
+            document.getElementById('blockSlotBtn')?.addEventListener('click', () => {
+                if (typeof saveUnavailableSlot === 'function') saveUnavailableSlot();
+            });
+            document.getElementById('deleteApptBtn')?.addEventListener('click', () => {
+                if (typeof deleteAppointment === 'function') deleteAppointment();
+            });
+            document.getElementById('addSameSlotBtn')?.addEventListener('click', () => {
+                if (typeof triggerAddSameSlot === 'function') triggerAddSameSlot();
             });
         }
 
