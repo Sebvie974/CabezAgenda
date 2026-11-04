@@ -554,6 +554,25 @@
                     </div>
                 </details>
             </div>
+
+            <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+                    <h4 style="margin-bottom: 8px; color: #2d3748;">Période de remplacement</h4>
+                    <div class="control-group">
+                        <label>Nom du remplaçant (vide = aucun)</label>
+                        <input type="text" id="adminSubName" placeholder="Prénom Nom">
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <div class="control-group" style="flex: 1;">
+                            <label>Début du remplacement</label>
+                            <input type="date" id="adminSubStart">
+                        </div>
+                        <div class="control-group" style="flex: 1;">
+                            <label>Fin (incluse)</label>
+                            <input type="date" id="adminSubEnd">
+                        </div>
+                    </div>
+                </div>
+
             <!--BOUTONS DE SAUVEGARDE-->
             <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
                 <h4 style="margin-bottom: 8px;">Sauvegarde et Restauration</h4>
@@ -1338,6 +1357,11 @@
             document.getElementById('adminEnd').value = floatToTime(config.end);
             document.getElementById('adminColor').value = config.color;
             renderAdminTypes(kineId);
+            const sub = kinesConfig[kineId].substitute;
+            const safeSetVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+            safeSetVal('adminSubName', sub ? sub.name : '');
+            safeSetVal('adminSubStart', sub ? sub.start : '');
+            safeSetVal('adminSubEnd', sub ? sub.end : '');
         }
 
         // CORRECTION : Fonction asynchrone (async) et attente de Supabase (await saveData())
@@ -1364,6 +1388,17 @@
             });
             config.allowedTypes = allowed;
             
+            const subName = document.getElementById('adminSubName').value.trim();
+            if (subName) {
+                kinesConfig[kineId].substitute = {
+                    name: subName,
+                    start: document.getElementById('adminSubStart').value,
+                    end: document.getElementById('adminSubEnd').value
+                };
+            } else {
+                kinesConfig[kineId].substitute = null;
+            }
+
             await saveData(); 
             
             updateKineSelects(); 
@@ -1843,7 +1878,7 @@
                     const activeK = selectedKine === 'all' ? allKinesKeys[0] : selectedKine;
                     headerHtml += `<button class="btn-day-config" onclick="openDayConfig('${activeK}', ${i}, '${dayNameStr}')" style="position: absolute; top: 4px; right: 4px; padding: 2px 4px; margin: 0; opacity: 0.7;" title="Horaires du jour">⚙️</button>
                     <div style="margin-top: 5px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                        <span class="nav-name-link" style="font-size: 0.8rem; color: ${kinesConfig[activeK].color}; cursor: pointer; font-weight: bold; background: ${hexToRgba(kinesConfig[activeK].color, 0.1)}; padding: 2px 8px; border-radius: 4px;" onclick="switchToGlobalView()" title="Retour à la vue globale">⬅ ${kinesConfig[activeK].name}</span>
+                        <span class="nav-name-link" style="font-size: 0.8rem; color: ${kinesConfig[activeK].color}; cursor: pointer; font-weight: bold; background: ${hexToRgba(kinesConfig[activeK].color, 0.1)}; padding: 2px 8px; border-radius: 4px;" onclick="switchToGlobalView()" title="Retour à la vue globale">⬅ ${getKineDisplayName(activeK, weekInfo.fullDates[i])}</span>
                     </div>`;
                 }
                 headerHtml += `</div>`;
@@ -1852,7 +1887,7 @@
                     headerHtml += `<div class="sub-header-labels" style="grid-template-columns: repeat(${allKinesKeys.length}, 1fr);">`;
                     for (const [key, kine] of Object.entries(kinesConfig)) {
                         headerHtml += `<div style="color: ${kine.color};">
-                            <span class="nav-name-link" style="cursor: pointer; font-weight: bold;" onclick="switchToSingleView('${key}')" title="Voir l'agenda de ${kine.name} uniquement">${kine.name}</span> 
+                            <span class="nav-name-link" style="cursor: pointer; font-weight: bold;" onclick="switchToSingleView('${key}')" title="Voir l'agenda de ${kine.name} uniquement">${getKineDisplayName(key, weekInfo.fullDates[i])}</span> 
                             <button class="btn-day-config" onclick="openDayConfig('${key}', ${i}, '${dayNameStr}')" style="position: absolute; right: 2px; margin: 0; padding: 0; opacity: 0.4;">⚙️</button>
                         </div>`;
                     }
@@ -2509,25 +2544,18 @@
             const histContent = document.getElementById('patientHistoryContent') || document.getElementById('historyContent');
             const histTitle = document.getElementById('patientHistoryTitle') || document.getElementById('historyTitle');
 
-            if (!histMod || !histContent || !histTitle) {
-                alert("Impossible d'afficher l'historique : la fenêtre HTML est introuvable.");
-                return;
-            }
+            if (!histMod || !histContent || !histTitle) return;
 
             histTitle.innerText = "Rendez-vous à venir : " + patientName;
 
-            // Calcul de la date du jour en heure locale (ex: 2026-11-04)
             const now = new Date();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-            // Filtre : uniquement les RDV à partir d'aujourd'hui, triés du plus proche au plus éloigné
             const patAppts = appointments.filter(a => 
-                a.patient && 
-                a.patient.toLowerCase() === patientName.toLowerCase() &&
-                a.exactDate >= todayStr // Ignore le passé
+                a.patient && a.patient.toLowerCase() === patientName.toLowerCase() && a.exactDate >= todayStr
             ).sort((a, b) => {
                 const dateDiff = new Date(a.exactDate) - new Date(b.exactDate);
-                if (dateDiff === 0) return a.timeStr.localeCompare(b.timeStr); // Si même jour, tri par heure
+                if (dateDiff === 0) return a.timeStr.localeCompare(b.timeStr); 
                 return dateDiff;
             });
 
@@ -2536,26 +2564,38 @@
             } else {
                 let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 5px;">';
                 patAppts.forEach(appt => {
-                    const kineName = kinesConfig[appt.kineId] ? kinesConfig[appt.kineId].name : 'Inconnu';
-                    // Récupération de la couleur du kiné (Gris par défaut si introuvable)
-                    const kineColor = kinesConfig[appt.kineId] ? kinesConfig[appt.kineId].color : '#cbd5e0';
+                    const kineObj = kinesConfig[appt.kineId];
+                    const kineName = kineObj ? kineObj.name : 'Inconnu';
+                    const kineColor = kineObj ? kineObj.color : '#718096';
                     
                     const dParts = appt.exactDate.split('-');
                     const frDate = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : appt.exactDate;
 
                     html += `
-                    <div style="border-left: 6px solid ${kineColor}; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                        <div>
-                            <div style="font-weight: bold; color: #2d3748; font-size: 1.05rem;">${frDate} à ${appt.timeStr}</div>
-                            <div style="font-size: 0.9rem; color: #4a5568; margin-top: 3px;">Avec ${kineName}</div>
+                    <div style="background-color: ${kineColor}; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="color: white;">
+                            <div style="font-weight: bold; font-size: 1.1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">${frDate} à ${appt.timeStr}</div>
+                            <div style="font-size: 0.95rem; margin-top: 4px; opacity: 0.95;">Avec ${kineName}</div>
                         </div>
-                        <button class="btn-save" onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 8px 12px; font-size: 0.85rem; background-color: ${kineColor}; color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Aller à</button>
+                        <button onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 8px 16px; font-size: 0.9rem; background-color: white; color: ${kineColor}; border: none; border-radius: 6px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer;">Aller à</button>
                     </div>`;
                 });
                 html += '</div>';
                 histContent.innerHTML = html;
             }
             histMod.style.display = 'flex';
+        };
+
+        window.getKineDisplayName = function(kineId, colDateStr) {
+            const kine = kinesConfig[kineId];
+            if (!kine) return '';
+            
+            if (kine.substitute && kine.substitute.name && kine.substitute.start && kine.substitute.end) {
+                if (colDateStr >= kine.substitute.start && colDateStr <= kine.substitute.end) {
+                    return `<span style="text-decoration: line-through; opacity: 0.6;">${kine.name}</span><br><span style="font-size: 0.85em; font-weight: 800; color: #e53e3e;">${kine.substitute.name}</span>`;
+                }
+            }
+            return kine.name;
         };
     </script>
 </body>
