@@ -556,14 +556,21 @@
             </div>
 
             <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
-                    <h4 style="margin-bottom: 8px; color: #2d3748;">Période de remplacement</h4>
+                    <h4 style="margin-bottom: 8px; color: #2d3748;">Statut du compte</h4>
+                    <div class="control-group" style="display: flex; gap: 15px;">
+                        <label><input type="checkbox" id="adminIsActive" style="cursor:pointer;"> Compte Actif</label>
+                        <label><input type="checkbox" id="adminIsSub" style="cursor:pointer;"> C'est un Remplaçant</label>
+                    </div>
+
+                    <h4 style="margin-top: 15px; margin-bottom: 8px; color: #2d3748;">Ce titulaire est remplacé par :</h4>
                     <div class="control-group">
-                        <label>Nom du remplaçant (vide = aucun)</label>
-                        <input type="text" id="adminSubName" placeholder="Prénom Nom">
+                        <select id="adminSubId">
+                            <option value="">-- Aucun --</option>
+                        </select>
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <div class="control-group" style="flex: 1;">
-                            <label>Début du remplacement</label>
+                            <label>Début</label>
                             <input type="date" id="adminSubStart">
                         </div>
                         <div class="control-group" style="flex: 1;">
@@ -1286,16 +1293,24 @@
 
         function updateKineSelects() {
             let filterHtml = '<option value="all">Tous les kinés (Globale)</option>', adminHtml = '';
-            for (const [key, kine] of Object.entries(kinesConfig)) {
-                filterHtml += `<option value="${key}">${kine.name}</option>`;
-                adminHtml += `<option value="${key}">${kine.name}</option>`;
-            }
-            if(practitionerFilter) practitionerFilter.innerHTML = filterHtml; 
-            if(adminKineSelect) adminKineSelect.innerHTML = adminHtml;
+            let activeTitularsHtml = '';
             
-            // NOUVEAU : On remplit aussi la liste déroulante de la fenêtre de RDV
+            for (const [key, kine] of Object.entries(kinesConfig)) {
+                adminHtml += `<option value="${key}">${kine.name}</option>`; // L'admin peut tout voir/modifier
+                
+                // Le planning et les créations de RDV ne listent que les titulaires actifs
+                if (kine.isActive !== false && !kine.isSubstitute) {
+                    filterHtml += `<option value="${key}">${kine.name}</option>`;
+                    activeTitularsHtml += `<option value="${key}">${kine.name}</option>`;
+                }
+            }
+            
+            const pf = document.getElementById('practitionerFilter');
+            if (pf) pf.innerHTML = filterHtml; 
+            const ak = document.getElementById('adminKineSelect');
+            if (ak) ak.innerHTML = adminHtml;
             const modalKineSelect = document.getElementById('newApptKine');
-            if (modalKineSelect) modalKineSelect.innerHTML = adminHtml;
+            if (modalKineSelect) modalKineSelect.innerHTML = activeTitularsHtml;
         }
 
         // --- GESTION ADMIN GLOBALE ---
@@ -1349,63 +1364,56 @@
         };
 
         window.loadAdminForm = function(kineId) {
-            if(!kinesConfig[kineId]) return;
-            const config = kinesConfig[kineId];
-            document.getElementById('adminName').value = config.name;
-            document.getElementById('adminSlot').value = config.slotDuration;
-            document.getElementById('adminStart').value = floatToTime(config.start);
-            document.getElementById('adminEnd').value = floatToTime(config.end);
-            document.getElementById('adminColor').value = config.color;
-            renderAdminTypes(kineId);
-            const sub = kinesConfig[kineId].substitute;
-            const safeSetVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-            safeSetVal('adminSubName', sub ? sub.name : '');
-            safeSetVal('adminSubStart', sub ? sub.start : '');
-            safeSetVal('adminSubEnd', sub ? sub.end : '');
-        }
+            const kine = kinesConfig[kineId];
+            if (!kine) return;
+            document.getElementById('adminName').value = kine.name || '';
+            document.getElementById('adminColor').value = kine.color || '#3182ce';
+            document.getElementById('adminDuration').value = kine.slotDuration || 30;
+            
+            // Actif par défaut si ce n'est pas encore défini
+            document.getElementById('adminIsActive').checked = kine.isActive !== false; 
+            document.getElementById('adminIsSub').checked = kine.isSubstitute === true;
 
-        // CORRECTION : Fonction asynchrone (async) et attente de Supabase (await saveData())
-        async function saveKineConfiguration() {
-            const kId = adminKineSelect.value;
-            const config = kinesConfig[kId];
-            
-            config.name = document.getElementById('adminName').value;
-            config.slotDuration = parseInt(document.getElementById('adminSlot').value);
-            config.start = timeToFloat(document.getElementById('adminStart').value);
-            config.end = timeToFloat(document.getElementById('adminEnd').value);
-            config.color = document.getElementById('adminColor').value;
-            
-            let allowed = [];
-            const rows = document.querySelectorAll('#adminTypesContainer .type-row');
-            rows.forEach(row => {
-                const key = row.getAttribute('data-key');
-                const isChecked = row.querySelector('.type-kine-check').checked;
-                const label = row.querySelector('.type-label').value;
-                const color = row.querySelector('.type-color').value;
-                
-                apptTypesConfig[key] = { label, color };
-                if (isChecked) allowed.push(key);
-            });
-            config.allowedTypes = allowed;
-            
-            const subName = document.getElementById('adminSubName').value.trim();
-            if (subName) {
-                kinesConfig[kineId].substitute = {
-                    name: subName,
-                    start: document.getElementById('adminSubStart').value,
-                    end: document.getElementById('adminSubEnd').value
-                };
-            } else {
-                kinesConfig[kineId].substitute = null;
+            // Remplir la liste déroulante avec les profils marqués comme "Remplaçant"
+            const subSelect = document.getElementById('adminSubId');
+            subSelect.innerHTML = '<option value="">-- Aucun --</option>';
+            for (const [id, k] of Object.entries(kinesConfig)) {
+                if (id !== kineId && k.isSubstitute) {
+                    subSelect.innerHTML += `<option value="${id}">${k.name}</option>`;
+                }
             }
-
-            await saveData(); 
             
-            updateKineSelects(); 
-            practitionerFilter.value = kId; 
-            renderCalendar(); 
-            adminModal.style.display = 'none';
-        }
+            subSelect.value = kine.subId || '';
+            document.getElementById('adminSubStart').value = kine.subStart || '';
+            document.getElementById('adminSubEnd').value = kine.subEnd || '';
+        };
+
+        window.saveKineConfiguration = function() {
+            const kineSelect = document.getElementById('adminKineSelect');
+            if (!kineSelect) return;
+            const kineId = kineSelect.value;
+            
+            if (kinesConfig[kineId]) {
+                kinesConfig[kineId].name = document.getElementById('adminName').value.trim() || kinesConfig[kineId].name;
+                kinesConfig[kineId].color = document.getElementById('adminColor').value || kinesConfig[kineId].color;
+                kinesConfig[kineId].slotDuration = parseInt(document.getElementById('adminDuration').value) || 30;
+                
+                kinesConfig[kineId].isActive = document.getElementById('adminIsActive').checked;
+                kinesConfig[kineId].isSubstitute = document.getElementById('adminIsSub').checked;
+                
+                kinesConfig[kineId].subId = document.getElementById('adminSubId').value;
+                kinesConfig[kineId].subStart = document.getElementById('adminSubStart').value;
+                kinesConfig[kineId].subEnd = document.getElementById('adminSubEnd').value;
+            }
+            
+            if (typeof saveData === 'function') {
+                saveData().then(() => {
+                    updateKineSelects();
+                    renderCalendar();
+                    document.getElementById('adminModal').style.display = 'none';
+                });
+            }
+        };
 
         async function createNewKine() {
             const newId = 'k' + Date.now(); 
@@ -1864,7 +1872,7 @@
 
             daysWrapper.innerHTML = '';
             const startDay = isMobile ? currentDayIndex : 0, endDay = isMobile ? currentDayIndex + 1 : 5;
-            const allKinesKeys = Object.keys(kinesConfig);
+            const allKinesKeys = Object.keys(kinesConfig).filter(k => kinesConfig[k].isActive !== false && !kinesConfig[k].isSubstitute);
 
             for (let i = startDay; i < endDay; i++) {
                 const dayCol = document.createElement('div'); dayCol.className = 'day-column';
@@ -2590,9 +2598,11 @@
             const kine = kinesConfig[kineId];
             if (!kine) return '';
             
-            if (kine.substitute && kine.substitute.name && kine.substitute.start && kine.substitute.end) {
-                if (colDateStr >= kine.substitute.start && colDateStr <= kine.substitute.end) {
-                    return `<span style="text-decoration: line-through; opacity: 0.6;">${kine.name}</span><br><span style="font-size: 0.85em; font-weight: 800; color: #e53e3e;">${kine.substitute.name}</span>`;
+            // Si le titulaire a un remplaçant sur cette période
+            if (kine.subId && kine.subStart && kine.subEnd && colDateStr >= kine.subStart && colDateStr <= kine.subEnd) {
+                const subKine = kinesConfig[kine.subId]; // On lit les infos du compte remplaçant
+                if (subKine) {
+                    return `<span style="text-decoration: line-through; opacity: 0.6;">${kine.name}</span><br><span style="font-size: 0.85em; font-weight: 800; color: #e53e3e;">${subKine.name}</span>`;
                 }
             }
             return kine.name;
