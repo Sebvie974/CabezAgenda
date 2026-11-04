@@ -362,7 +362,26 @@
                     <label>Notes</label>
                     <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..."></textarea>
                 </div>
-                <input type="hidden" id="editApptId"><input type="hidden" id="newApptKine"><input type="hidden" id="newApptDay"><input type="hidden" id="newApptTime"><input type="hidden" id="newApptExactDate">
+                <!-- Champs visibles pour déplacer le RDV -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                    <div class="control-group">
+                        <label>Date du RDV</label>
+                        <!-- Le onchange met à jour le jour de la semaine en arrière-plan -->
+                        <input type="date" id="newApptExactDate" onchange="updateDayIndexFromDate()">
+                    </div>
+                    <div class="control-group">
+                        <label>Heure</label>
+                        <input type="time" id="newApptTime">
+                    </div>
+                </div>
+                <div class="control-group" style="margin-top: 10px;">
+                    <label>Praticien</label>
+                    <select id="newApptKine"></select>
+                </div>
+
+                <!-- On garde uniquement l'ID et l'index du jour en cache -->
+                <input type="hidden" id="editApptId">
+                <input type="hidden" id="newApptDay">
             </div>
             <div class="modal-actions">
                 <button class="btn-cancel" id="cancelApptBtn">Annuler</button>
@@ -1114,7 +1133,12 @@
                 filterHtml += `<option value="${key}">${kine.name}</option>`;
                 adminHtml += `<option value="${key}">${kine.name}</option>`;
             }
-            practitionerFilter.innerHTML = filterHtml; adminKineSelect.innerHTML = adminHtml;
+            if(practitionerFilter) practitionerFilter.innerHTML = filterHtml; 
+            if(adminKineSelect) adminKineSelect.innerHTML = adminHtml;
+            
+            // NOUVEAU : On remplit aussi la liste déroulante de la fenêtre de RDV
+            const modalKineSelect = document.getElementById('newApptKine');
+            if (modalKineSelect) modalKineSelect.innerHTML = adminHtml;
         }
 
         // --- GESTION ADMIN GLOBALE ---
