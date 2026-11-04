@@ -186,7 +186,12 @@
         
         .modal-content h3 { color: #63b3ed; font-size: 1.1rem; margin-bottom: 0;}
         .modal-body { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-actions { 
+                display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; 
+            }
+            .modal-actions button { 
+                flex: 1; min-width: 30%; padding: 8px 5px; font-size: 0.85rem; white-space: nowrap; 
+        }
 
         /* Encadré d'options RDV */
         .options-box {
@@ -1279,6 +1284,9 @@
         };
 
         window.openAddModal = function(kine, dayIndex, time, exactDate) {
+            // 1. On génère les types de RDV autorisés pour ce kiné avant d'afficher
+            if (typeof updateTypeSelectLabels === 'function') updateTypeSelectLabels(kine);
+
             const safeSetValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
             const safeSetChecked = (id, isChecked) => { const el = document.getElementById(id); if (el) el.checked = isChecked; };
 
@@ -1303,14 +1311,18 @@
             if (phoneCont) phoneCont.innerHTML = '';
 
             const title = document.getElementById('modalTitle');
+            if (title) title.innerText = 'Nouveau Rendez-vous';
             const confirmBtn = document.getElementById('confirmApptBtn');
             if (confirmBtn) confirmBtn.innerText = 'Ajouter';
-            if (title) title.innerText = 'Nouveau Rendez-vous';
 
             const delBtn = document.getElementById('deleteApptBtn');
             if (delBtn) delBtn.style.display = 'none';
             const sameBtn = document.getElementById('addSameSlotBtn');
             if (sameBtn) sameBtn.style.display = 'none';
+            
+            // 2. On affiche le bouton "Bloquer" à la création
+            const blockBtn = document.getElementById('blockSlotBtn');
+            if (blockBtn) blockBtn.style.display = 'inline-block';
 
             const modal = document.getElementById('addApptModal');
             if (modal) modal.style.display = 'flex';
@@ -1321,10 +1333,12 @@
             const appt = apptList.find(a => String(a.id) === String(apptId));
             if (!appt) return;
 
+            // 1. On génère les types de RDV du kiné pour pré-remplir le menu
+            if (typeof updateTypeSelectLabels === 'function') updateTypeSelectLabels(appt.kineId);
+
             const safeSetValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
             const safeSetChecked = (id, isChecked) => { const el = document.getElementById(id); if (el) el.checked = isChecked; };
 
-            // On utilise les vrais noms de variables Supabase
             safeSetValue('editApptId', appt.id);
             safeSetValue('newApptKine', appt.kineId);
             safeSetValue('newApptDay', appt.dayIndex);
@@ -1349,14 +1363,18 @@
             safeSetChecked('newApptCV', appt.isCV || false);
 
             const title = document.getElementById('modalTitle');
+            if (title) title.innerText = 'Modifier le Rendez-vous';
             const confirmBtn = document.getElementById('confirmApptBtn');
             if (confirmBtn) confirmBtn.innerText = 'Modifier';
-            if (title) title.innerText = 'Modifier le Rendez-vous';
 
             const delBtn = document.getElementById('deleteApptBtn');
             if (delBtn) delBtn.style.display = 'inline-block';
             const sameBtn = document.getElementById('addSameSlotBtn');
             if (sameBtn) sameBtn.style.display = 'inline-block';
+            
+            // 2. On cache le bouton "Bloquer" car il est inutile en mode édition
+            const blockBtn = document.getElementById('blockSlotBtn');
+            if (blockBtn) blockBtn.style.display = 'none';
 
             if (typeof window.fillPatientData === 'function' && appt.patient) window.fillPatientData(appt.patient);
 
