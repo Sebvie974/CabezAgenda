@@ -1335,7 +1335,14 @@
             if (blockBtn) blockBtn.style.display = 'inline-block';
 
             const modal = document.getElementById('addApptModal');
-            if (modal) modal.style.display = 'flex';
+            if (modal) {
+                modal.style.display = 'flex';
+                // NOUVEAU : Focus automatique après un très léger délai
+                setTimeout(() => {
+                    const nameInput = document.getElementById('newPatientName');
+                    if (nameInput) nameInput.focus();
+                }, 100);
+            }
         };
 
         window.openEditModal = function(apptId) {
@@ -1399,7 +1406,20 @@
             if (blockBtn) blockBtn.style.display = 'none';
 
             const modal = document.getElementById('addApptModal');
-            if (modal) modal.style.display = 'flex';
+            if (modal) {
+                modal.style.display = 'flex';
+                // NOUVEAU : Focus automatique 
+                setTimeout(() => {
+                    const nameInput = document.getElementById('newPatientName');
+                    if (nameInput) {
+                        nameInput.focus();
+                        // Place le curseur à la fin du texte existant
+                        const val = nameInput.value; 
+                        nameInput.value = ''; 
+                        nameInput.value = val; 
+                    }
+                }, 100);
+            }
         };
 
         window.triggerAddSameSlot = function() {
@@ -1558,11 +1578,17 @@
 
             const baseDate = getVal('newApptExactDate', new Date().toISOString().split('T')[0]);
 
+            // NOUVEAU : Mémoire de l'ancien nom pour la propagation
+            let oldPatientName = null;
+
             if (editId) {
                 baseApptData.id = parseInt(editId);
                 baseApptData.exactDate = baseDate;
                 const index = appointments.findIndex(a => a.id === baseApptData.id);
-                if (index !== -1) appointments[index] = baseApptData;
+                if (index !== -1) {
+                    oldPatientName = appointments[index].patient; // Capture l'ancien nom
+                    appointments[index] = baseApptData;
+                }
             } else {
                 const dateParts = baseDate ? baseDate.split('-') : [];
                 const startDateObj = dateParts.length === 3 ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2]) : new Date();
@@ -1589,7 +1615,6 @@
                         const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
                         const dd = String(nextDate.getDate()).padStart(2, '0');
 
-                        // CORRECTION MAJEURE : Génération d'un ID compatible avec Supabase (max 2 milliards)
                         const safeId = Math.floor(Math.random() * 1000000000) + 1000;
                         const newAppt = { ...baseApptData, id: safeId };
                         newAppt.exactDate = `${yyyy}-${mm}-${dd}`;
@@ -1609,6 +1634,11 @@
 
             if (patientNameStr !== 'Indisponible' && patientNameStr !== 'Patient') {
                 appointments.forEach(a => {
+                    // NOUVEAU : Si le nom a été modifié, on le répercute sur les autres RDV
+                    if (oldPatientName && oldPatientName !== 'Indisponible' && oldPatientName !== 'Patient' && a.patient && a.patient.toLowerCase() === oldPatientName.toLowerCase()) {
+                        a.patient = patientNameStr;
+                    }
+                    // On applique la synchro des numéros/notes au nouveau nom
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
                         a.phones = [...phonesArray];
                         a.note = currentNote;
@@ -1616,7 +1646,6 @@
                 });
             }
 
-            // On s'assure que la sauvegarde est bien terminée avant de recharger l'affichage
             saveData().then(() => {
                 updatePatientSuggestions(); 
                 const mod = document.getElementById('addApptModal');
