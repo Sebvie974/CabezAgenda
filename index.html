@@ -130,7 +130,11 @@
             overflow: hidden; 
         }
         
-        .appointment:hover { transform: scale(1.01); z-index: 50; box-shadow: 0 2px 5px rgba(0,0,0,0.15); height: max-content !important; padding-bottom: 6px; overflow: visible; }
+        .appointment:hover { 
+            z-index: 50; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.25); 
+            overflow: visible; 
+        }
         
         .appointment .appt-patient-name { font-weight: 700; display: block; font-size: 0.8rem; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .appointment .appt-time-details { display: block; font-size: 0.7rem; opacity: 0.85; white-space: nowrap; margin-bottom: 2px; }
@@ -316,47 +320,7 @@
                     <datalist id="patientsList"></datalist>
                 </div>
 
-                <!-- Ligne 2 : Date, Heure, Praticien -->
-                <div style="display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; gap: 10px;">
-                    <div class="control-group">
-                        <label>Date du RDV</label>
-                        <input type="date" id="newApptExactDate" onchange="updateDayIndexFromDate()">
-                    </div>
-                    <div class="control-group">
-                        <label>Heure</label>
-                        <input type="time" id="newApptTime">
-                    </div>
-                    <div class="control-group">
-                        <label>Praticien</label>
-                        <select id="newApptKine"></select>
-                    </div>
-                </div>
-
-                <!-- Ligne 3 : Type et Statut -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div class="control-group">
-                        <label>Type de RDV</label>
-                        <select id="newApptType"></select>
-                    </div>
-                    <div class="control-group">
-                        <label>Statut de la séance</label>
-                        <select id="newApptStatus"></select>
-                    </div>
-                </div>
-
-                <!-- Ligne 4 : Téléphone et Durée -->
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
-                    <div class="control-group">
-                        <label>Téléphone(s)</label>
-                        <div id="phoneInputsContainer" style="display: flex; flex-direction: column; gap: 5px;"></div>
-                    </div>
-                    <div class="control-group">
-                        <label>Durée (min)</label>
-                        <input type="number" id="newApptDuration" step="10">
-                    </div>
-                </div>
-
-                <!-- Options sous forme compacte -->
+                <!-- Ligne 2 : Options (Déplacées ici) -->
                 <div class="options-box" style="margin-top: 0; padding: 8px; gap: 8px;">
                     <div style="display: flex; flex-wrap: wrap; gap: 12px; width: 100%;">
                         <div style="display: flex; align-items: center; gap: 4px;">
@@ -382,7 +346,47 @@
                     </div>
                 </div>
 
-                <!-- Notes réduites en hauteur -->
+                <!-- Ligne 3 : Date, Heure, Praticien -->
+                <div style="display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Date du RDV</label>
+                        <input type="date" id="newApptExactDate" onchange="updateDayIndexFromDate()">
+                    </div>
+                    <div class="control-group">
+                        <label>Heure</label>
+                        <input type="time" id="newApptTime">
+                    </div>
+                    <div class="control-group">
+                        <label>Praticien</label>
+                        <select id="newApptKine"></select>
+                    </div>
+                </div>
+
+                <!-- Ligne 4 : Type et Statut -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Type de RDV</label>
+                        <select id="newApptType"></select>
+                    </div>
+                    <div class="control-group">
+                        <label>Statut de la séance</label>
+                        <select id="newApptStatus"></select>
+                    </div>
+                </div>
+
+                <!-- Ligne 5 : Téléphone et Durée -->
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Téléphone(s)</label>
+                        <div id="phoneInputsContainer" style="display: flex; flex-direction: column; gap: 5px;"></div>
+                    </div>
+                    <div class="control-group">
+                        <label>Durée (min)</label>
+                        <input type="number" id="newApptDuration" step="10">
+                    </div>
+                </div>
+
+                <!-- Notes -->
                 <div class="control-group">
                     <label>Notes</label>
                     <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..." style="min-height: 40px; height: 45px;"></textarea>
