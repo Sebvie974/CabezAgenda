@@ -314,6 +314,11 @@
                     <input type="text" id="newPatientName" list="patientsList" placeholder="Ex: Jean Dupont" autocomplete="off">
                     <datalist id="patientsList"></datalist>
                 </div>
+
+                <div class="control-group">
+                    <label>Statut de la séance</label>
+                    <select id="newApptStatus"></select>
+                </div>
                 
                 <div class="options-box">
                     <div style="display: flex; align-items: center; gap: 5px;">
@@ -1285,7 +1290,7 @@
 
         window.openAddModal = function(kine, dayIndex, time, exactDate) {
             if (typeof updateTypeSelectLabels === 'function') updateTypeSelectLabels(kine);
-            if (typeof updateStatusSelectLabels === 'function') updateStatusSelectLabels(); // Génère les statuts
+            if (typeof updateStatusSelectLabels === 'function') updateStatusSelectLabels(); 
 
             const safeSetValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
             const safeSetChecked = (id, isChecked) => { const el = document.getElementById(id); if (el) el.checked = isChecked; };
@@ -1299,7 +1304,7 @@
             safeSetValue('newPatientName', '');
             safeSetValue('newApptNotes', '');
             safeSetValue('newApptRemaining', '');
-            safeSetValue('newApptStatus', ''); // Réinitialise le statut par défaut
+            safeSetValue('newApptStatus', ''); 
             
             safeSetChecked('newApptImportant', false);
             safeSetChecked('newApptFirstVisit', false);
@@ -1309,7 +1314,12 @@
             if (kinesConfig && kinesConfig[kine]) safeSetValue('newApptDuration', kinesConfig[kine].slotDuration || 30);
 
             const phoneCont = document.getElementById('phoneInputsContainer');
-            if (phoneCont) phoneCont.innerHTML = '';
+            if (phoneCont) {
+                phoneCont.innerHTML = `<div style="display: flex; gap: 5px;">
+                    <input type="tel" class="appt-phone-input" placeholder="Numéro">
+                    <button class="btn-cancel" style="padding: 0 10px;" onclick="addPhoneField()">+</button>
+                </div>`;
+            }
 
             const title = document.getElementById('modalTitle');
             if (title) title.innerText = 'Nouveau Rendez-vous';
@@ -1334,7 +1344,7 @@
             if (!appt) return;
 
             if (typeof updateTypeSelectLabels === 'function') updateTypeSelectLabels(appt.kineId);
-            if (typeof updateStatusSelectLabels === 'function') updateStatusSelectLabels(); // Génère les statuts
+            if (typeof updateStatusSelectLabels === 'function') updateStatusSelectLabels(); 
 
             const safeSetValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
             const safeSetChecked = (id, isChecked) => { const el = document.getElementById(id); if (el) el.checked = isChecked; };
@@ -1349,7 +1359,7 @@
             safeSetValue('newApptNotes', appt.note || '');
             safeSetValue('newApptRemaining', appt.remainingSessions || '');
             safeSetValue('newApptDuration', appt.duration || 30);
-            safeSetValue('newApptStatus', appt.status || ''); // Recharge le statut mémorisé
+            safeSetValue('newApptStatus', appt.status || ''); 
             
             const typeSelect = document.getElementById('newApptType');
             if (typeSelect) {
@@ -1363,6 +1373,18 @@
             safeSetChecked('newApptLastVisit', appt.isLastVisit || false);
             safeSetChecked('newApptCV', appt.isCV || false);
 
+            const phoneCont = document.getElementById('phoneInputsContainer');
+            if (phoneCont) {
+                phoneCont.innerHTML = '';
+                const phones = (appt.phones && appt.phones.length > 0) ? appt.phones : [''];
+                phones.forEach((phone, index) => {
+                    phoneCont.innerHTML += `<div style="display: flex; gap: 5px;">
+                        <input type="tel" class="appt-phone-input" value="${phone}" placeholder="Numéro">
+                        <button class="btn-cancel" style="padding: 0 10px; ${index !== 0 ? 'border-color: #e53e3e; color: #e53e3e;' : ''}" onclick="${index === 0 ? 'addPhoneField()' : 'this.parentElement.remove()'}">${index === 0 ? '+' : '-'}</button>
+                    </div>`;
+                });
+            }
+
             const title = document.getElementById('modalTitle');
             if (title) title.innerText = 'Modifier le Rendez-vous';
             const confirmBtn = document.getElementById('confirmApptBtn');
@@ -1375,8 +1397,6 @@
             
             const blockBtn = document.getElementById('blockSlotBtn');
             if (blockBtn) blockBtn.style.display = 'none';
-
-            if (typeof window.fillPatientData === 'function' && appt.patient) window.fillPatientData(appt.patient);
 
             const modal = document.getElementById('addApptModal');
             if (modal) modal.style.display = 'flex';
