@@ -2682,12 +2682,13 @@
         window.getKineDisplayName = function(kineId, colDateStr) {
             const kine = kinesConfig[kineId];
             if (!kine) return '';
-            
-            // Si le titulaire a un remplaçant sur cette période
-            if (kine.subId && kine.subStart && kine.subEnd && colDateStr >= kine.subStart && colDateStr <= kine.subEnd) {
-                const subKine = kinesConfig[kine.subId]; // On lit les infos du compte remplaçant
-                if (subKine) {
-                    return `<span style="text-decoration: line-through; opacity: 0.6;">${kine.name}</span><br><span style="font-size: 0.85em; font-weight: 800; color: #e53e3e;">${subKine.name}</span>`;
+
+            if (kine.replacementSessions) {
+                // On cherche si une session correspond à la date de la colonne
+                const activeSession = kine.replacementSessions.find(s => colDateStr >= s.start && colDateStr <= s.end);
+                if (activeSession && kinesConfig[activeSession.subId]) {
+                    const subName = kinesConfig[activeSession.subId].name;
+                    return `<span style="text-decoration: line-through; opacity: 0.6;">${kine.name}</span><br><span style="font-size: 0.85em; font-weight: 800; color: #e53e3e;">${subName}</span>`;
                 }
             }
             return kine.name;
@@ -2933,6 +2934,7 @@
             
             if (!name) return alert("Veuillez saisir un prénom/nom.");
 
+            // On revient à l'email basé uniquement sur le prénom (ex: julien@cabinet.fr)
             const cleanId = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
             const email = `${cleanId}@cabinet.fr`;
             const password = `Kine${Math.floor(1000 + Math.random() * 9000)}!`;
@@ -2943,7 +2945,9 @@
             });
 
             const { data, error } = await tempClient.auth.signUp({ email: email, password: password });
-            if (error) return alert("Erreur lors de la création des accès : " + error.message);
+            
+            // Si le compte existe déjà, Supabase renvoie l'erreur et on prévient l'utilisateur
+            if (error) return alert("Erreur : Ce compte existe déjà ou l'adresse est invalide (" + error.message + ")");
 
             await supabaseClient.from('profiles').update({ role: 'remplacant', kine_id: newId }).eq('id', data.user.id);
             
@@ -2953,7 +2957,7 @@
             
             if (typeof saveData === 'function') {
                 await saveData();
-                alert(`✅ PROFIL ET ACCÈS CRÉÉS AVEC SUCCÈS !\n\nRemplaçant : ${name}\nEmail : ${email}\nMot de passe : ${password}\n\nTransmettez ces accès pour qu'il/elle puisse se connecter.`);
+                alert(`✅ PROFIL ET ACCÈS CRÉÉS AVEC SUCCÈS !\n\nRemplaçant : ${name}\nIdentifiant de connexion : ${cleanId} (ou ${email})\nMot de passe : ${password}\n\nTransmettez ces accès pour qu'il/elle puisse se connecter.`);
                 if (nameInput) nameInput.value = '';
                 window.openSubstitutesModal(); 
             }
