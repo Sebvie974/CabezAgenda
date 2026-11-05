@@ -718,19 +718,31 @@
         </div>
     </div>
 
-    <!-- NOUVELLE MODALE : GESTION DES REMPLAÇANTS -->
+    <!-- MODALE : GESTION DES REMPLAÇANTS -->
     <div class="modal-overlay" id="substitutesModal" style="display: none;">
         <div class="modal-content" style="width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="color: #e53e3e;">🤝 Sessions de Remplacement</h3>
+                <h3 style="color: #e53e3e;">🤝 Remplaçants & Sessions</h3>
                 <button class="btn-cancel" onclick="document.getElementById('substitutesModal').style.display='none'" style="padding: 0 10px; font-weight: bold; border-color: #e53e3e; color: #e53e3e;">X</button>
             </div>
 
             <div class="modal-body" style="overflow-y: auto; flex-grow: 1; padding-right: 5px;">
                 
-                <!-- Zone 1 : Créer une session -->
+                <!-- Zone 1 : Créer un profil Remplaçant -->
+                <div style="background: #ebf8fa; padding: 15px; border-radius: 8px; border: 1px solid #b2e2eb; margin-bottom: 15px;">
+                    <h4 style="margin-top: 0; color: #2c7a7b;">1. Créer un nouveau profil remplaçant</h4>
+                    <div style="display: flex; gap: 10px; align-items: flex-end;">
+                        <div class="control-group" style="flex: 1; margin: 0;">
+                            <label>Prénom / Nom du remplaçant</label>
+                            <input type="text" id="newSubName" placeholder="Ex: Julien">
+                        </div>
+                        <button class="btn-save" onclick="createSubstituteProfile()" style="background-color: #319795; height: 38px; margin: 0;">Créer le profil</button>
+                    </div>
+                </div>
+
+                <!-- Zone 2 : Créer une session -->
                 <div style="background: #f7fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; color: #2b6cb0;">Nouvelle session sur l'agenda</h4>
+                    <h4 style="margin-top: 0; color: #2b6cb0;">2. Placer un remplaçant sur l'agenda</h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
                         <div class="control-group">
                             <label>Qui effectue le remplacement ?</label>
@@ -754,7 +766,7 @@
                     <button class="btn-save" onclick="saveReplacementSession()" style="width: 100%; background-color: #38a169;">Enregistrer la session</button>
                 </div>
 
-                <!-- Zone 2 : Historique et filtre -->
+                <!-- Zone 3 : Historique et filtre -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">
                     <h4 style="margin: 0; color: #2d3748;">Historique des sessions</h4>
                     <select id="historyFilter" onchange="renderReplacementHistory()" style="padding: 4px; border-radius: 4px; border: 1px solid #cbd5e0; font-size: 0.85rem;">
@@ -987,73 +999,63 @@
             if (noteEl && foundNote && !noteEl.value) noteEl.value = foundNote;
         };
 
-        window.openPatientHistoryGlobal = function(typedName) {
-            if(!typedName) return;
-            const searchName = typedName.trim().toLowerCase();
-            const patientAppts = appointments.filter(a => a.patient && a.patient.trim().toLowerCase() === searchName);
-            
-            const listEl = document.getElementById('globalPatientHistoryList');
-            if(!listEl) return;
-            listEl.innerHTML = '';
-            
-            document.getElementById('historyModalTitle').textContent = `Rendez-vous de : ${typedName.trim()}`;
-            
-            if(patientAppts.length === 0) {
-                listEl.innerHTML = '<li style="padding: 15px; text-align: center; color: #718096; background: #f7fafc; border-radius: 6px;">Aucun rendez-vous trouvé pour ce patient.</li>';
+        window.openPatientHistoryGlobal = function(patientName) {
+            if (!patientName) return;
+
+            const histMod = document.getElementById('patientHistoryModal') || document.getElementById('historyModal');
+            const histContent = document.getElementById('patientHistoryContent') || document.getElementById('historyContent');
+            const histTitle = document.getElementById('patientHistoryTitle') || document.getElementById('historyTitle');
+
+            if (!histMod || !histContent || !histTitle) return;
+
+            histTitle.innerText = "Rendez-vous à venir : " + patientName;
+
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            const patAppts = appointments.filter(a => 
+                a.patient && a.patient.toLowerCase() === patientName.toLowerCase() && a.exactDate >= todayStr
+            ).sort((a, b) => {
+                const dateDiff = new Date(a.exactDate) - new Date(b.exactDate);
+                if (dateDiff === 0) return a.timeStr.localeCompare(b.timeStr); 
+                return dateDiff;
+            });
+
+            if (patAppts.length === 0) {
+                histContent.innerHTML = "<p style='padding: 10px; color: #718096;'>Aucun rendez-vous à venir trouvé pour ce patient.</p>";
             } else {
-                const sortedAppts = [...patientAppts].sort((a, b) => new Date(`${a.exactDate}T${a.timeStr}`) - new Date(`${b.exactDate}T${b.timeStr}`));
-                const now = new Date();
-                const currentYMD = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-                const currentMins = now.getHours() * 60 + now.getMinutes();
+                let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 5px;">';
+                
+                // Tableau pour traduire le jour de la semaine
+                const joursFr = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
-                // Tableau pour récupérer le nom du jour
-                const dayNamesFR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-
-                sortedAppts.forEach(a => {
-                    const dParts = a.exactDate.split('-');
-                    let dateStr = a.exactDate;
+                patAppts.forEach(appt => {
+                    const kineObj = kinesConfig[appt.kineId];
+                    const kineName = kineObj ? kineObj.name : 'Inconnu';
+                    const kineColor = kineObj ? kineObj.color : '#718096';
                     
-                    // Ajout du jour de la semaine avant la date
+                    const dParts = appt.exactDate.split('-');
+                    let frDate = appt.exactDate;
+                    
                     if (dParts.length === 3) {
-                        const dObj = new Date(a.exactDate);
-                        dateStr = `${dayNamesFR[dObj.getDay()]} ${dParts[2]}/${dParts[1]}/${dParts[0]}`;
-                    }
-                    
-                    const kName = kinesConfig[a.kineId] ? kinesConfig[a.kineId].name : 'Kiné inconnu';
-                    const kColor = kinesConfig[a.kineId] ? kinesConfig[a.kineId].color : '#3182ce';
-                    
-                    let isPast = false;
-                    if (a.exactDate < currentYMD) {
-                        isPast = true;
-                    } else if (a.exactDate === currentYMD) {
-                        const [h, m] = a.timeStr.split(':').map(Number);
-                        const apptEndMins = (h * 60) + m + a.duration;
-                        if (currentMins >= apptEndMins) isPast = true;
+                        const dateObj = new Date(appt.exactDate);
+                        const nomJour = joursFr[dateObj.getDay()]; // Récupère le nom du jour
+                        frDate = `${nomJour} ${dParts[2]}/${dParts[1]}/${dParts[0]}`;
                     }
 
-                    let statusBadge = '';
-                    if (a.status === 'no_show') statusBadge = '<span style="background: rgba(0,0,0,0.2); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">Pas venu</span>';
-                    if (a.status === 'cancelled_today') statusBadge = '<span style="background: #fed7d7; color: #c53030; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">Annulé</span>';
-                    if (a.status === 'cancelled_24h') statusBadge = '<span style="background: rgba(0,0,0,0.2); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">Annulé 24h</span>';
-                    if (a.vegaPointed) statusBadge += '<span style="background: #c6f6d5; color: #276749; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px;">✅ Vega</span>';
-
-                    const itemBg = isPast ? hexToRgba(kColor, 0.5) : hexToRgba(kColor, 0.85);
-                    const itemBorder = isPast ? hexToRgba(kColor, 0.3) : kColor;
-                    const itemOp = isPast ? '0.75' : '1';
-
-                    listEl.innerHTML += `
-                        <li style="background: ${itemBg}; border: 1px solid ${itemBorder}; border-left: 4px solid ${kColor}; padding: 10px; border-radius: 6px; opacity: ${itemOp}; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                            <div>
-                                <div style="font-weight: bold; color: white; text-shadow: 0px 1px 2px rgba(0,0,0,0.3); margin-bottom: 4px; font-size: 0.95rem;">📅 ${dateStr} à ${a.timeStr} ${statusBadge}</div>
-                                <div style="font-size: 0.8rem; color: #f7fafc; text-shadow: 0px 1px 1px rgba(0,0,0,0.2);">👤 <b style="color: white;">${kName}</b> | ⏳ ${a.duration} min</div>
-                            </div>
-                            <button class="btn-save" style="padding: 4px 10px; font-size: 0.75rem; min-width: auto; height: auto; background-color: white; color: ${kColor}; border: 1px solid white;" onclick="window.openEditModalFromHistory(${a.id})">Aller au RDV</button>
-                        </li>
-                    `;
+                    html += `
+                    <div style="background-color: ${kineColor}; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="color: white;">
+                            <div style="font-weight: bold; font-size: 1.1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">${frDate} à ${appt.timeStr}</div>
+                            <div style="font-size: 0.95rem; margin-top: 4px; opacity: 0.95;">Avec ${kineName}</div>
+                        </div>
+                        <button onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 8px 16px; font-size: 0.9rem; background-color: white; color: ${kineColor}; border: none; border-radius: 6px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer;">Aller à</button>
+                    </div>`;
                 });
+                html += '</div>';
+                histContent.innerHTML = html;
             }
-            
-            document.getElementById('patientHistoryGlobalModal').style.display = 'flex';
+            histMod.style.display = 'flex';
         };
 
         window.openEditModalFromHistory = function(apptId) {
@@ -2824,6 +2826,35 @@
                 }
             }
             return kine.name;
+        };
+
+        window.createSubstituteProfile = function() {
+            const nameInput = document.getElementById('newSubName');
+            const name = nameInput ? nameInput.value.trim() : '';
+            
+            if (!name) {
+                alert("Veuillez saisir un prénom/nom.");
+                return;
+            }
+            
+            // Génération d'un ID unique
+            const newId = 'kine_' + Date.now();
+            kinesConfig[newId] = {
+                name: name,
+                color: '#718096', // Couleur grise neutre par défaut
+                slotDuration: 30,
+                isActive: true,
+                isSubstitute: true, // Le tag magique pour qu'il soit reconnu comme remplaçant !
+                replacementSessions: []
+            };
+            
+            if (typeof saveData === 'function') {
+                saveData().then(() => {
+                    alert(`Le profil remplaçant "${name}" a été créé avec succès !`);
+                    if (nameInput) nameInput.value = '';
+                    window.openSubstitutesModal(); // Rafraîchit les listes déroulantes immédiatement
+                });
+            }
         };
     </script>
 </body>
