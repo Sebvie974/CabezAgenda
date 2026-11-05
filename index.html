@@ -1344,14 +1344,15 @@
             dateSelect.value = d.toISOString().split('T')[0]; renderCalendar();
         }
 
-        function updateKineSelects() {
+        window.updateKineSelects = function() {
             let filterHtml = '<option value="all">Tous les kinés (Globale)</option>', adminHtml = '';
             let activeTitularsHtml = '';
             
             for (const [key, kine] of Object.entries(kinesConfig)) {
-                adminHtml += `<option value="${key}">${kine.name}</option>`; // L'admin peut tout voir/modifier
+                // L'admin voit tout le monde pour pouvoir les configurer
+                adminHtml += `<option value="${key}">${kine.name}</option>`; 
                 
-                // Le planning et les créations de RDV ne listent que les titulaires actifs
+                // Le planning et les créations de RDV ne listent QUE les titulaires actifs (Pas de remplaçants)
                 if (kine.isActive !== false && !kine.isSubstitute) {
                     filterHtml += `<option value="${key}">${kine.name}</option>`;
                     activeTitularsHtml += `<option value="${key}">${kine.name}</option>`;
@@ -1364,7 +1365,7 @@
             if (ak) ak.innerHTML = adminHtml;
             const modalKineSelect = document.getElementById('newApptKine');
             if (modalKineSelect) modalKineSelect.innerHTML = activeTitularsHtml;
-        }
+        };
 
         // --- GESTION ADMIN GLOBALE ---
         function renderAdminTypes(kineId) {
@@ -1930,9 +1931,15 @@
             return { dates, fullDates };
         }
 
-        function renderCalendar() {
-            renderTimeAxis(); 
-            const selectedKine = practitionerFilter.value, isMobile = window.innerWidth <= 768;
+        window.renderCalendar = function() {
+            if (typeof renderTimeAxis === 'function') renderTimeAxis(); 
+            const practitionerFilter = document.getElementById('practitionerFilter');
+            const dateSelect = document.getElementById('dateSelect');
+            const calendarGrid = document.getElementById('mainCalendarGrid');
+            const daysWrapper = document.getElementById('daysWrapper');
+            
+            const selectedKine = practitionerFilter ? practitionerFilter.value : 'all';
+            const isMobile = window.innerWidth <= 768;
             
             let currentDayIndex = new Date(dateSelect.value).getDay(); 
             currentDayIndex = (currentDayIndex === 0 || currentDayIndex === 6) ? 0 : currentDayIndex - 1;
@@ -1943,6 +1950,8 @@
 
             daysWrapper.innerHTML = '';
             const startDay = isMobile ? currentDayIndex : 0, endDay = isMobile ? currentDayIndex + 1 : 5;
+            
+            // LE FILTRE EST ICI : On exclut les profils désactivés et les remplaçants
             const allKinesKeys = Object.keys(kinesConfig).filter(k => kinesConfig[k].isActive !== false && !kinesConfig[k].isSubstitute);
 
             for (let i = startDay; i < endDay; i++) {
@@ -1955,21 +1964,24 @@
                 
                 if(selectedKine !== 'all') {
                     const activeK = selectedKine === 'all' ? allKinesKeys[0] : selectedKine;
-                    headerHtml += `<button class="btn-day-config" onclick="openDayConfig('${activeK}', ${i}, '${dayNameStr}')" style="position: absolute; top: 4px; right: 4px; padding: 2px 4px; margin: 0; opacity: 0.7;" title="Horaires du jour">⚙️</button>
-                    <div style="margin-top: 5px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                        <span class="nav-name-link" style="font-size: 0.8rem; color: ${kinesConfig[activeK].color}; cursor: pointer; font-weight: bold; background: ${hexToRgba(kinesConfig[activeK].color, 0.1)}; padding: 2px 8px; border-radius: 4px;" onclick="switchToGlobalView()" title="Retour à la vue globale">⬅ ${getKineDisplayName(activeK, weekInfo.fullDates[i])}</span>
-                    </div>`;
+                    if(activeK && kinesConfig[activeK]) {
+                        headerHtml += `<button class="btn-day-config" onclick="openDayConfig('${activeK}', ${i}, '${dayNameStr}')" style="position: absolute; top: 4px; right: 4px; padding: 2px 4px; margin: 0; opacity: 0.7;" title="Horaires du jour">⚙️</button>
+                        <div style="margin-top: 5px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                            <span class="nav-name-link" style="font-size: 0.8rem; color: ${kinesConfig[activeK].color}; cursor: pointer; font-weight: bold; background: ${hexToRgba(kinesConfig[activeK].color, 0.1)}; padding: 2px 8px; border-radius: 4px;" onclick="switchToGlobalView()" title="Retour à la vue globale">⬅ ${getKineDisplayName(activeK, weekInfo.fullDates[i])}</span>
+                        </div>`;
+                    }
                 }
                 headerHtml += `</div>`;
 
                 if (!isMobile && selectedKine === 'all') {
                     headerHtml += `<div class="sub-header-labels" style="grid-template-columns: repeat(${allKinesKeys.length}, 1fr);">`;
-                    for (const [key, kine] of Object.entries(kinesConfig)) {
+                    allKinesKeys.forEach(key => {
+                        const kine = kinesConfig[key];
                         headerHtml += `<div style="color: ${kine.color};">
                             <span class="nav-name-link" style="cursor: pointer; font-weight: bold;" onclick="switchToSingleView('${key}')" title="Voir l'agenda de ${kine.name} uniquement">${getKineDisplayName(key, weekInfo.fullDates[i])}</span> 
                             <button class="btn-day-config" onclick="openDayConfig('${key}', ${i}, '${dayNameStr}')" style="position: absolute; right: 2px; margin: 0; padding: 0; opacity: 0.4;">⚙️</button>
                         </div>`;
-                    }
+                    });
                     headerHtml += `</div>`;
                 }
                 dayCol.innerHTML = headerHtml;
@@ -1983,12 +1995,12 @@
                     });
                 } else {
                     const activeKine = selectedKine === 'all' ? allKinesKeys[0] : selectedKine;
-                    if(kinesConfig[activeKine]) subGrid.appendChild(createKineColumn(activeKine, i, weekInfo.fullDates[i]));
+                    if(activeKine && kinesConfig[activeKine]) subGrid.appendChild(createKineColumn(activeKine, i, weekInfo.fullDates[i]));
                 }
 
                 dayCol.appendChild(subGrid); daysWrapper.appendChild(dayCol);
             }
-        }
+        };
 
         function createKineColumn(kineId, dayIndex, exactDate) {
             const config = kinesConfig[kineId], col = document.createElement('div');
