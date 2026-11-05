@@ -2840,7 +2840,7 @@
             return kine.name;
         };
 
-        window.createSubstituteProfile = function() {
+        window.createSubstituteProfile = async function() {
             const nameInput = document.getElementById('newSubName');
             const name = nameInput ? nameInput.value.trim() : '';
             
@@ -2848,24 +2848,46 @@
                 alert("Veuillez saisir un prénom/nom.");
                 return;
             }
+
+            // 1. Préparation des identifiants de connexion
+            const cleanId = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
+            const email = `${cleanId}@cabinet.fr`;
+            const password = `Kine${Math.floor(1000 + Math.random() * 9000)}!`;
+            const newId = 'sub_' + cleanId + '_' + Date.now(); // ID unique pour la base
             
-            // Génération d'un ID unique
-            const newId = 'kine_' + Date.now();
+            // 2. Création du compte dans Supabase Auth (Sans déconnecter l'admin actuel)
+            const tempClient = window.supabase.createClient(supabaseUrl, supabaseKey, {
+                auth: { persistSession: false, autoRefreshToken: false }
+            });
+
+            const { data, error } = await tempClient.auth.signUp({ email: email, password: password });
+            if (error) {
+                alert("Erreur lors de la création des accès : " + error.message);
+                return;
+            }
+
+            // 3. Affectation du rôle "remplaçant" à ce nouveau compte
+            await supabaseClient.from('profiles').update({
+                role: 'remplacant',
+                kine_id: newId
+            }).eq('id', data.user.id);
+            
+            // 4. Création du profil visuel dans ton agenda
             kinesConfig[newId] = {
                 name: name,
                 color: '#718096', // Couleur grise neutre par défaut
                 slotDuration: 30,
                 isActive: true,
-                isSubstitute: true, // Le tag magique pour qu'il soit reconnu comme remplaçant !
+                isSubstitute: true, // Le tag magique
                 replacementSessions: []
             };
             
+            // 5. Sauvegarde globale et affichage des identifiants
             if (typeof saveData === 'function') {
-                saveData().then(() => {
-                    alert(`Le profil remplaçant "${name}" a été créé avec succès !`);
-                    if (nameInput) nameInput.value = '';
-                    window.openSubstitutesModal(); // Rafraîchit les listes déroulantes immédiatement
-                });
+                await saveData();
+                alert(`✅ PROFIL ET ACCÈS CRÉÉS AVEC SUCCÈS !\n\nRemplaçant : ${name}\nEmail : ${email}\nMot de passe : ${password}\n\nTransmettez ces accès pour qu'il/elle puisse se connecter au cabinet.`);
+                if (nameInput) nameInput.value = '';
+                window.openSubstitutesModal(); // Rafraîchit les listes déroulantes immédiatement
             }
         };
     </script>
