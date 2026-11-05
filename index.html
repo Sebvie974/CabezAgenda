@@ -649,6 +649,7 @@
             <!-- ZONE DES BOUTONS D'ACTION (BANDEAU) -->
             <div style="display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap;">
                 <button class="btn-save" id="toggleSecretariatBtn" style="background-color: #805ad5; height: 38px; margin: 0; padding: 0 12px;">📠 Pointage</button>
+                <button class="btn-save" onclick="window.openSubstitutesModal()" style="background-color: #e53e3e; height: 38px; margin: 0; padding: 0 12px;" title="Gérer les remplacements">🤝 Remplaçants</button>
                 <button class="btn-save" id="openAdminBtn" style="background-color: #4a5568; height: 38px; margin: 0; padding: 0 12px;">⚙️ Config</button>
                 <button class="btn-save" onclick="openNotesModal()" style="background-color: #d69e2e; height: 38px; margin: 0; padding: 0 12px;" title="Notes du Cabinet">📝 Notes</button>
                 <button class="btn-cancel" onclick="forceAppUpdate()" style="border-color: #ecc94b; color: #d69e2e; height: 38px; margin: 0; padding: 0 8px;" title="Forcer la mise à jour">🔄</button>
@@ -712,6 +713,56 @@
                 
                 <ul id="notesList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
                     <!-- Les notes s'afficheront ici -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOUVELLE MODALE : GESTION DES REMPLAÇANTS -->
+    <div class="modal-overlay" id="substitutesModal" style="display: none;">
+        <div class="modal-content" style="width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: #e53e3e;">🤝 Sessions de Remplacement</h3>
+                <button class="btn-cancel" onclick="document.getElementById('substitutesModal').style.display='none'" style="padding: 0 10px; font-weight: bold; border-color: #e53e3e; color: #e53e3e;">X</button>
+            </div>
+
+            <div class="modal-body" style="overflow-y: auto; flex-grow: 1; padding-right: 5px;">
+                
+                <!-- Zone 1 : Créer une session -->
+                <div style="background: #f7fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; color: #2b6cb0;">Nouvelle session sur l'agenda</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div class="control-group">
+                            <label>Qui effectue le remplacement ?</label>
+                            <select id="sessionSubSelect"></select>
+                        </div>
+                        <div class="control-group">
+                            <label>Quel agenda (titulaire) ?</label>
+                            <select id="sessionTitularSelect"></select>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div class="control-group">
+                            <label>Du (inclus)</label>
+                            <input type="date" id="sessionStartDate">
+                        </div>
+                        <div class="control-group">
+                            <label>Au (inclus)</label>
+                            <input type="date" id="sessionEndDate">
+                        </div>
+                    </div>
+                    <button class="btn-save" onclick="saveReplacementSession()" style="width: 100%; background-color: #38a169;">Enregistrer la session</button>
+                </div>
+
+                <!-- Zone 2 : Historique et filtre -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">
+                    <h4 style="margin: 0; color: #2d3748;">Historique des sessions</h4>
+                    <select id="historyFilter" onchange="renderReplacementHistory()" style="padding: 4px; border-radius: 4px; border: 1px solid #cbd5e0; font-size: 0.85rem;">
+                        <!-- Options générées par JS -->
+                    </select>
+                </div>
+                <ul id="replacementHistoryList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Liste des sessions injectée par JS -->
                 </ul>
             </div>
         </div>
@@ -2621,6 +2672,155 @@
                 const subKine = kinesConfig[kine.subId]; // On lit les infos du compte remplaçant
                 if (subKine) {
                     return `<span style="text-decoration: line-through; opacity: 0.6;">${kine.name}</span><br><span style="font-size: 0.85em; font-weight: 800; color: #e53e3e;">${subKine.name}</span>`;
+                }
+            }
+            return kine.name;
+        };
+
+        // --- NOUVEAU MODULE : GESTION CENTRALISÉE DES REMPLAÇANTS ---
+
+        window.openSubstitutesModal = function() {
+            const subSelect = document.getElementById('sessionSubSelect');
+            const titSelect = document.getElementById('sessionTitularSelect');
+            const filter = document.getElementById('historyFilter');
+
+            subSelect.innerHTML = '<option value="">-- Choisir un remplaçant --</option>';
+            titSelect.innerHTML = '<option value="">-- Choisir un titulaire --</option>';
+            filter.innerHTML = '<option value="all">Toutes les sessions confondues</option>';
+
+            // Remplissage des listes déroulantes
+            for (const [id, kine] of Object.entries(kinesConfig)) {
+                if (kine.isSubstitute) {
+                    subSelect.innerHTML += `<option value="${id}">${kine.name}</option>`;
+                    filter.innerHTML += `<option value="sub_${id}">Filtre : Remplaçant ${kine.name}</option>`;
+                } else if (kine.isActive !== false) {
+                    titSelect.innerHTML += `<option value="${id}">${kine.name}</option>`;
+                    filter.innerHTML += `<option value="tit_${id}">Filtre : Titulaire ${kine.name}</option>`;
+                }
+            }
+
+            document.getElementById('sessionStartDate').value = '';
+            document.getElementById('sessionEndDate').value = '';
+
+            renderReplacementHistory();
+            document.getElementById('substitutesModal').style.display = 'flex';
+        };
+
+        window.saveReplacementSession = function() {
+            const subId = document.getElementById('sessionSubSelect').value;
+            const titId = document.getElementById('sessionTitularSelect').value;
+            const start = document.getElementById('sessionStartDate').value;
+            const end = document.getElementById('sessionEndDate').value;
+
+            if (!subId || !titId || !start || !end) {
+                alert("Veuillez remplir tous les champs pour créer la session.");
+                return;
+            }
+            if (start > end) {
+                alert("La date de fin ne peut pas être avant la date de début.");
+                return;
+            }
+
+            // Création du "dossier" d'historique pour ce titulaire s'il n'existe pas encore
+            if (!kinesConfig[titId].replacementSessions) {
+                kinesConfig[titId].replacementSessions = [];
+            }
+
+            // Ajout de la nouvelle session
+            kinesConfig[titId].replacementSessions.push({
+                id: Date.now().toString(),
+                subId: subId,
+                start: start,
+                end: end
+            });
+
+            if (typeof saveData === 'function') {
+                saveData().then(() => {
+                    renderReplacementHistory();
+                    if (typeof renderCalendar === 'function') renderCalendar();
+                });
+            }
+        };
+
+        window.deleteReplacementSession = function(titId, sessionId) {
+            if (!confirm("Voulez-vous vraiment annuler/supprimer cette session de remplacement ?")) return;
+
+            if (kinesConfig[titId] && kinesConfig[titId].replacementSessions) {
+                kinesConfig[titId].replacementSessions = kinesConfig[titId].replacementSessions.filter(s => s.id !== sessionId);
+                if (typeof saveData === 'function') {
+                    saveData().then(() => {
+                        renderReplacementHistory();
+                        if (typeof renderCalendar === 'function') renderCalendar();
+                    });
+                }
+            }
+        };
+
+        window.renderReplacementHistory = function() {
+            const list = document.getElementById('replacementHistoryList');
+            const filterVal = document.getElementById('historyFilter').value;
+            if (!list) return;
+
+            let allSessions = [];
+            // Rassemblement de l'historique de tous les kinés
+            for (const [titId, kine] of Object.entries(kinesConfig)) {
+                if (kine.replacementSessions) {
+                    kine.replacementSessions.forEach(session => {
+                        allSessions.push({
+                            ...session,
+                            titId: titId,
+                            titName: kine.name,
+                            subName: kinesConfig[session.subId] ? kinesConfig[session.subId].name : 'Supprimé'
+                        });
+                    });
+                }
+            }
+
+            // Application du filtre (Titulaire ou Remplaçant)
+            if (filterVal !== 'all') {
+                const [type, id] = filterVal.split('_');
+                if (type === 'sub') allSessions = allSessions.filter(s => s.subId === id);
+                else if (type === 'tit') allSessions = allSessions.filter(s => s.titId === id);
+            }
+
+            // Tri chronologique
+            allSessions.sort((a, b) => new Date(b.start) - new Date(a.start));
+
+            if (allSessions.length === 0) {
+                list.innerHTML = "<p style='color: #718096; padding: 10px;'>Aucune session trouvée.</p>";
+                return;
+            }
+
+            let html = '';
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            allSessions.forEach(s => {
+                const frStart = s.start.split('-').reverse().join('/');
+                const frEnd = s.end.split('-').reverse().join('/');
+                const isPast = s.end < todayStr;
+
+                html += `
+                <li style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; background: ${isPast ? '#edf2f7' : 'white'}; display: flex; justify-content: space-between; align-items: center; opacity: ${isPast ? '0.6' : '1'};">
+                    <div>
+                        <div style="font-weight: bold; color: #2b6cb0; font-size: 1.05rem;">${s.subName} <span style="color: #4a5568; font-weight: normal; font-size: 0.9rem;">remplace</span> ${s.titName}</div>
+                        <div style="font-size: 0.85rem; color: #4a5568; margin-top: 4px;">📅 Du ${frStart} au ${frEnd}</div>
+                    </div>
+                    <button class="btn-cancel" onclick="deleteReplacementSession('${s.titId}', '${s.id}')" style="border-color: #e53e3e; color: #e53e3e; padding: 4px 8px; font-size: 0.8rem;">Supprimer</button>
+                </li>`;
+            });
+            list.innerHTML = html;
+        };
+
+        // Redéfinition de l'affichage sur le calendrier (Lecture depuis le nouvel historique)
+        window.getKineDisplayName = function(kineId, colDateStr) {
+            const kine = kinesConfig[kineId];
+            if (!kine) return '';
+
+            if (kine.replacementSessions) {
+                const activeSession = kine.replacementSessions.find(s => colDateStr >= s.start && colDateStr <= s.end);
+                if (activeSession && kinesConfig[activeSession.subId]) {
+                    const subName = kinesConfig[activeSession.subId].name;
+                    return `<span style="text-decoration: line-through; opacity: 0.6;">${kine.name}</span><br><span style="font-size: 0.85em; font-weight: 800; color: #e53e3e;">${subName}</span>`;
                 }
             }
             return kine.name;
