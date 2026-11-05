@@ -1366,26 +1366,34 @@
         window.loadAdminForm = function(kineId) {
             const kine = kinesConfig[kineId];
             if (!kine) return;
-            document.getElementById('adminName').value = kine.name || '';
-            document.getElementById('adminColor').value = kine.color || '#3182ce';
-            document.getElementById('adminDuration').value = kine.slotDuration || 30;
             
-            // Actif par défaut si ce n'est pas encore défini
-            document.getElementById('adminIsActive').checked = kine.isActive !== false; 
-            document.getElementById('adminIsSub').checked = kine.isSubstitute === true;
+            const safeSetVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+            const safeSetCheck = (id, checked) => { const el = document.getElementById(id); if (el) el.checked = checked; };
+
+            safeSetVal('adminName', kine.name || '');
+            safeSetVal('adminColor', kine.color || '#3182ce');
+            
+            // Correction : Utilisation du bon ID 'adminSlot' au lieu de 'adminDuration'
+            safeSetVal('adminSlot', kine.slotDuration || 30);
+
+            // Statut du compte
+            safeSetCheck('adminIsActive', kine.isActive !== false); 
+            safeSetCheck('adminIsSub', kine.isSubstitute === true);
 
             // Remplir la liste déroulante avec les profils marqués comme "Remplaçant"
             const subSelect = document.getElementById('adminSubId');
-            subSelect.innerHTML = '<option value="">-- Aucun --</option>';
-            for (const [id, k] of Object.entries(kinesConfig)) {
-                if (id !== kineId && k.isSubstitute) {
-                    subSelect.innerHTML += `<option value="${id}">${k.name}</option>`;
+            if (subSelect) {
+                subSelect.innerHTML = '<option value="">-- Aucun --</option>';
+                for (const [id, k] of Object.entries(kinesConfig)) {
+                    if (id !== kineId && k.isSubstitute) {
+                        subSelect.innerHTML += `<option value="${id}">${k.name}</option>`;
+                    }
                 }
+                subSelect.value = kine.subId || '';
             }
             
-            subSelect.value = kine.subId || '';
-            document.getElementById('adminSubStart').value = kine.subStart || '';
-            document.getElementById('adminSubEnd').value = kine.subEnd || '';
+            safeSetVal('adminSubStart', kine.subStart || '');
+            safeSetVal('adminSubEnd', kine.subEnd || '');
         };
 
         window.saveKineConfiguration = function() {
@@ -1393,24 +1401,34 @@
             if (!kineSelect) return;
             const kineId = kineSelect.value;
             
+            const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
+            const getCheck = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
+            
             if (kinesConfig[kineId]) {
-                kinesConfig[kineId].name = document.getElementById('adminName').value.trim() || kinesConfig[kineId].name;
-                kinesConfig[kineId].color = document.getElementById('adminColor').value || kinesConfig[kineId].color;
-                kinesConfig[kineId].slotDuration = parseInt(document.getElementById('adminDuration').value) || 30;
+                const newName = getVal('adminName');
+                if (newName) kinesConfig[kineId].name = newName.trim();
                 
-                kinesConfig[kineId].isActive = document.getElementById('adminIsActive').checked;
-                kinesConfig[kineId].isSubstitute = document.getElementById('adminIsSub').checked;
+                const newColor = getVal('adminColor');
+                if (newColor) kinesConfig[kineId].color = newColor;
                 
-                kinesConfig[kineId].subId = document.getElementById('adminSubId').value;
-                kinesConfig[kineId].subStart = document.getElementById('adminSubStart').value;
-                kinesConfig[kineId].subEnd = document.getElementById('adminSubEnd').value;
+                // Correction : Lecture du bon ID 'adminSlot'
+                const newSlot = getVal('adminSlot');
+                if (newSlot) kinesConfig[kineId].slotDuration = parseInt(newSlot) || 30;
+                
+                kinesConfig[kineId].isActive = getCheck('adminIsActive');
+                kinesConfig[kineId].isSubstitute = getCheck('adminIsSub');
+                
+                kinesConfig[kineId].subId = getVal('adminSubId') || '';
+                kinesConfig[kineId].subStart = getVal('adminSubStart') || '';
+                kinesConfig[kineId].subEnd = getVal('adminSubEnd') || '';
             }
             
             if (typeof saveData === 'function') {
                 saveData().then(() => {
-                    updateKineSelects();
-                    renderCalendar();
-                    document.getElementById('adminModal').style.display = 'none';
+                    if (typeof updateKineSelects === 'function') updateKineSelects();
+                    if (typeof renderCalendar === 'function') renderCalendar();
+                    const adminMod = document.getElementById('adminModal');
+                    if (adminMod) adminMod.style.display = 'none';
                 });
             }
         };
