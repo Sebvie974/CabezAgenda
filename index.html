@@ -2042,16 +2042,27 @@
         };
 
         function renderTimeAxis() {
-            const sKine = practitionerFilter.value;
+            const practitionerFilter = document.getElementById('practitionerFilter');
+            const sKine = practitionerFilter ? practitionerFilter.value : 'all';
+            const timeAxis = document.getElementById('timeAxis');
+            if (!timeAxis) return;
+            
             let html = '<div class="time-header"></div>';
-            if (sKine === 'all') {
-                for (let h = START_HOUR; h < END_HOUR; h++) 
+            
+            // Si c'est la vue globale, une vue double, ou le bouton de configuration, on utilise l'affichage standard (1h)
+            if (sKine === 'all' || sKine.startsWith('double_')) {
+                for (let h = START_HOUR; h < END_HOUR; h++) {
                     html += `<div class="time-slot-hour" style="height: ${60 * PIXELS_PER_MINUTE}px;"><span>${h}:00</span></div>`;
+                }
             } else {
-                const slot = kinesConfig[sKine].slotDuration, slotsCount = ((END_HOUR - START_HOUR) * 60) / slot;
-                for (let i = 0; i < slotsCount; i++) {
-                    const mins = i * slot, h = Math.floor(mins / 60) + START_HOUR, m = mins % 60;
-                    html += `<div class="time-slot-hour" style="height: ${slot * PIXELS_PER_MINUTE}px;"><span>${h}:${m.toString().padStart(2,'0')}</span></div>`;
+                // Si c'est un kiné seul, on affiche les heures selon la durée de ses créneaux
+                if (kinesConfig[sKine]) {
+                    const slot = kinesConfig[sKine].slotDuration || 30;
+                    const slotsCount = ((END_HOUR - START_HOUR) * 60) / slot;
+                    for (let i = 0; i < slotsCount; i++) {
+                        const mins = i * slot, h = Math.floor(mins / 60) + START_HOUR, m = mins % 60;
+                        html += `<div class="time-slot-hour" style="height: ${slot * PIXELS_PER_MINUTE}px;"><span>${h}:${m.toString().padStart(2,'0')}</span></div>`;
+                    }
                 }
             }
             timeAxis.innerHTML = html;
