@@ -327,7 +327,34 @@
             pointer-events: none; padding-top: 2px; text-align: right; width: 100%;
         }
     </style>
+    <style>
+        /* CORRECTION AFFICHAGE MOBILE BARRE D'OUTILS */
+        @media (max-width: 768px) {
+            .toolbar {
+                height: auto !important; /* Laisse la barre s'agrandir selon le besoin */
+                padding-bottom: 15px;
+            }
+            .toolbar .controls {
+                display: flex;
+                flex-direction: column; /* Aligne les blocs de haut en bas */
+                gap: 12px;
+            }
+            .toolbar .control-group {
+                width: 100% !important; /* Prend toute la largeur de l'écran */
+            }
+            .toolbar .control-group > div {
+                flex-wrap: wrap; /* Permet au bouton Aujourd'hui de passer à la ligne si besoin */
+            }
+            /* Zone des boutons d'action (Zoom, Pointage, Profil...) */
+            .toolbar .controls > div:last-child {
+                width: 100%;
+                justify-content: center;
+                margin-top: 5px;
+            }
+        }
+    </style>
 </head>
+
 <body>
     <!-- ÉCRAN DE CONNEXION -->
     <div id="authScreen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2d3748; z-index: 10000; display: flex; justify-content: center; align-items: center;">
