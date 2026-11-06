@@ -657,16 +657,16 @@
         <div class="controls">
             <div class="control-group" style="width: 100%; max-width: 350px;">
                 <label>Date</label>
-                <!-- Ligne 1 : Navigation Date (Les flèches encadrent la date et s'étirent) -->
-                <div style="display: flex; gap: 5px; width: 100%; margin-bottom: 8px;">
-                    <button class="btn-cancel" id="prevDateBtn" style="padding: 0 15px; font-weight: bold; font-size: 1.1rem;">&lt;</button>
-                    <input type="date" id="dateSelect" style="flex-grow: 1; text-align: center;">
-                    <button class="btn-cancel" id="nextDateBtn" style="padding: 0 15px; font-weight: bold; font-size: 1.1rem;">&gt;</button>
+                <!-- Ligne 1 : Navigation Date (Verrouillée sur une seule ligne) -->
+                <div style="display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 5px; width: 100%; margin-bottom: 8px;">
+                    <button class="btn-cancel" id="prevDateBtn" style="flex: 0 0 auto; padding: 0 15px; font-weight: bold; font-size: 1.1rem; margin: 0;">&lt;</button>
+                    <input type="date" id="dateSelect" style="flex: 1 1 auto; min-width: 0; text-align: center; margin: 0; padding: 0 5px;">
+                    <button class="btn-cancel" id="nextDateBtn" style="flex: 0 0 auto; padding: 0 15px; font-weight: bold; font-size: 1.1rem; margin: 0;">&gt;</button>
                 </div>
                 <!-- Ligne 2 : Actions rapides (Centrées juste en dessous) -->
-                <div style="display: flex; gap: 5px; width: 100%;">
-                    <button class="btn-save" id="todayBtn" onclick="const d = document.getElementById('dateSelect'); if(d) { const now = new Date(); d.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0'); d.dispatchEvent(new Event('change')); }" style="flex: 1; background-color: #4a5568;">Aujourd'hui</button>
-                    <button class="btn-cancel" onclick="window.toggleZoom()" style="flex: 1; border-color: #3182ce; color: #3182ce;" title="Zoom">🔍 Zoom</button>
+                <div style="display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 5px; width: 100%;">
+                    <button class="btn-save" id="todayBtn" onclick="const d = document.getElementById('dateSelect'); if(d) { const now = new Date(); d.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0'); d.dispatchEvent(new Event('change')); }" style="flex: 1; background-color: #4a5568; margin: 0; padding: 0;">Aujourd'hui</button>
+                    <button class="btn-cancel" onclick="window.toggleZoom()" style="flex: 1; border-color: #3182ce; color: #3182ce; margin: 0; padding: 0;" title="Zoom">🔍 Zoom</button>
                 </div>
             </div>
             
