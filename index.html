@@ -580,6 +580,32 @@
                         <button class="btn-save" onclick="createAccount()" style="background-color: #38a169; width: 100%;">Générer le compte et les accès</button>
                     </div>
                 </details>
+
+                <!-- GESTION DES ABSENCES SECRÉTARIAT -->
+                <details style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                    <summary style="color: #d69e2e; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
+                        🏖️ Absences du Secrétariat (Affichage Global)
+                    </summary>
+                    <div style="padding-top: 5px;">
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-end;">
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <label style="font-size: 0.7rem; color: #718096;">Début</label>
+                                <input type="date" id="newSecAbsenceStart">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <label style="font-size: 0.7rem; color: #718096;">Fin (inclus)</label>
+                                <input type="date" id="newSecAbsenceEnd">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
+                                <label style="font-size: 0.7rem; color: #718096;">Message affiché</label>
+                                <input type="text" id="newSecAbsenceLabel" placeholder="Ex: SEB ABSENT" style="font-weight: bold;">
+                            </div>
+                            <button class="btn-save" onclick="addSecretariatAbsence()" style="background-color: #d69e2e; height: 32px; margin: 0; padding: 0 15px;">Ajouter</button>
+                        </div>
+                        <ul id="secAbsencesList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto;"></ul>
+                    </div>
+                </details>
+
             </div>
 
             <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
@@ -2069,7 +2095,8 @@
             return { dates, fullDates };
         }
 
-        let holidaysConfig = []; // NOUVEAU : Base de données des jours fériés
+        let holidaysConfig = [];
+        let secretariatAbsences = []; // NOUVEAU : Base pour tes absences
 
         // --- SAUVEGARDE ET CHARGEMENT ---
         async function loadDataFromSupabase() {
@@ -2080,7 +2107,8 @@
                         if (row.key === 'kinesConfig') kinesConfig = row.data;
                         if (row.key === 'apptTypesConfig') apptTypesConfig = row.data;
                         if (row.key === 'statusConfig') statusConfig = row.data;
-                        if (row.key === 'holidaysConfig') holidaysConfig = row.data; // Charge les jours fériés
+                        if (row.key === 'holidaysConfig') holidaysConfig = row.data;
+                        if (row.key === 'secretariatAbsences') secretariatAbsences = row.data; // Charge tes absences
                     });
                 }
                 const { data: apptData } = await supabaseClient.from('appointments').select('*');
@@ -2103,7 +2131,8 @@
                     { key: 'kinesConfig', data: kinesConfig },
                     { key: 'apptTypesConfig', data: apptTypesConfig },
                     { key: 'statusConfig', data: statusConfig },
-                    { key: 'holidaysConfig', data: holidaysConfig } // Sauvegarde les jours fériés
+                    { key: 'holidaysConfig', data: holidaysConfig },
+                    { key: 'secretariatAbsences', data: secretariatAbsences } // Sauvegarde tes absences
                 ]);
                 if (appointments && appointments.length > 0) {
                     const apptsToSave = appointments.map(a => ({
@@ -2259,6 +2288,75 @@
         };
 
         // --- AFFICHAGE MIS À JOUR (JOURS FÉRIÉS & TRANSMISSION DE LA DATE) ---
+        // --- GESTION DES ABSENCES DU SECRÉTARIAT ---
+        window.addSecretariatAbsence = function() {
+            const start = document.getElementById('newSecAbsenceStart').value;
+            const end = document.getElementById('newSecAbsenceEnd').value;
+            const label = document.getElementById('newSecAbsenceLabel').value.trim() || 'SECRÉTARIAT ABSENT';
+
+            if (!start || !end) return alert("Veuillez remplir les dates de début et de fin.");
+            if (start > end) return alert("La date de fin doit être après ou égale à la date de début.");
+
+            if (!secretariatAbsences) secretariatAbsences = [];
+            secretariatAbsences.push({ id: 'sec_abs_' + Date.now(), start: start, end: end, label: label });
+
+            if (typeof saveData === 'function') {
+                saveData().then(() => {
+                    renderSecretariatAbsences();
+                    if (typeof renderCalendar === 'function') renderCalendar();
+                });
+            }
+            
+            document.getElementById('newSecAbsenceStart').value = '';
+            document.getElementById('newSecAbsenceEnd').value = '';
+            document.getElementById('newSecAbsenceLabel').value = '';
+        };
+
+        window.deleteSecretariatAbsence = function(absId) {
+            secretariatAbsences = secretariatAbsences.filter(a => a.id !== absId);
+            if (typeof saveData === 'function') {
+                saveData().then(() => {
+                    renderSecretariatAbsences();
+                    if (typeof renderCalendar === 'function') renderCalendar();
+                });
+            }
+        };
+
+        window.renderSecretariatAbsences = function() {
+            const list = document.getElementById('secAbsencesList');
+            if(!list) return;
+            list.innerHTML = '';
+            
+            if(!secretariatAbsences || secretariatAbsences.length === 0) {
+                list.innerHTML = '<li style="color:#718096; font-size:0.85rem; font-style: italic;">Aucune absence prévue.</li>';
+                return;
+            }
+            
+            secretariatAbsences.sort((a, b) => new Date(a.start) - new Date(b.start));
+            
+            secretariatAbsences.forEach(a => {
+                const frStart = a.start.split('-').reverse().join('/');
+                const frEnd = a.end.split('-').reverse().join('/');
+                list.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; background:#fffff0; padding:6px 10px; border:1px solid #d69e2e; border-radius:4px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="color:#b7791f; font-weight:bold; font-size:0.9rem;">${a.label}</span>
+                        <span style="font-size: 0.75rem; color: #718096;">Du ${frStart} au ${frEnd}</span>
+                    </div>
+                    <button class="btn-cancel" onclick="deleteSecretariatAbsence('${a.id}')" style="padding:2px 8px; font-size:0.75rem; border-color:#e53e3e; color:#e53e3e; margin:0;">X</button>
+                </li>`;
+            });
+        };
+
+        // Rend tes absences visibles quand on ouvre Config
+        setTimeout(() => {
+            const btn = document.getElementById('openAdminBtn');
+            if(btn) btn.addEventListener('click', () => { 
+                if(typeof renderHolidaysList === 'function') renderHolidaysList(); 
+                if(typeof renderSecretariatAbsences === 'function') renderSecretariatAbsences(); 
+            });
+        }, 1000);
+
+        // --- MISE A JOUR : AFFICHAGE DU CALENDRIER (AVEC BANDEAU GLOBAL) ---
         window.renderCalendar = function() {
             if (typeof renderTimeAxis === 'function') renderTimeAxis(); 
             const practitionerFilter = document.getElementById('practitionerFilter');
@@ -2300,11 +2398,11 @@
                 const exactDateStr = weekInfo.fullDates[i]; 
                 const dayNameStr = `${DAYS_FR[i]} ${weekInfo.dates[i]}`;
                 
-                // INDICATEUR JOUR FÉRIÉ (Format JJ/MM)
+                // 1. INDICATEUR JOUR FÉRIÉ
                 let holidayHtml = '';
                 if (typeof holidaysConfig !== 'undefined' && holidaysConfig) {
                     const dateParts = exactDateStr.split('-');
-                    const dayMonth = `${dateParts[2]}/${dateParts[1]}`; // Transforme YYYY-MM-DD en DD/MM
+                    const dayMonth = `${dateParts[2]}/${dateParts[1]}`; 
                     const holiday = holidaysConfig.find(h => h.date === dayMonth);
                     
                     if (holiday) {
@@ -2313,7 +2411,17 @@
                     }
                 }
 
-                let headerHtml = `${holidayHtml}<div class="day-header"><span class="day-name">${dayNameStr}</span>`;
+                // 2. INDICATEUR D'ABSENCE GLOBALE (SECRÉTARIAT)
+                let secAbsenceHtml = '';
+                if (typeof secretariatAbsences !== 'undefined' && secretariatAbsences.length > 0) {
+                    const isAbsent = secretariatAbsences.find(a => exactDateStr >= a.start && exactDateStr <= a.end);
+                    if (isAbsent) {
+                        secAbsenceHtml = `<div style="background-color: #d69e2e; color: white; font-size: 0.85rem; text-align: center; font-weight: bold; padding: 4px; margin: 4px 5px 0 5px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); letter-spacing: 0.5px;">🏖️ ${isAbsent.label.toUpperCase()}</div>`;
+                    }
+                }
+
+                // CONSTRUCTION DE L'EN-TÊTE DU JOUR
+                let headerHtml = `${holidayHtml}<div class="day-header"><span class="day-name">${dayNameStr}</span>${secAbsenceHtml}`;
                 
                 if(!isGlobalOrDouble) {
                     const activeK = viewKinesKeys[0];
