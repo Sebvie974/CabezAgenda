@@ -655,14 +655,18 @@
     <header class="toolbar">
         <div class="brand"><h1>Planning du Cabinet</h1></div>
         <div class="controls">
-            <div class="control-group" style="width: auto;">
+            <div class="control-group" style="width: 100%; max-width: 350px;">
                 <label>Date</label>
-                <div style="display: flex; gap: 5px;">
-                    <button class="btn-cancel" id="prevDateBtn" style="padding: 0 10px;">&lt;</button>
-                    <input type="date" id="dateSelect">
-                    <button class="btn-cancel" id="nextDateBtn" style="padding: 0 10px;">&gt;</button>
-                    <button class="btn-save" id="todayBtn" onclick="const d = document.getElementById('dateSelect'); if(d) { const now = new Date(); d.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0'); d.dispatchEvent(new Event('change')); }" style="padding: 0 10px; background-color: #4a5568;">Aujourd'hui</button>
-                    <button class="btn-cancel" onclick="window.toggleZoom()" style="padding: 0 10px; border-color: #3182ce; color: #3182ce;" title="Zoom">🔍 Zoom</button>
+                <!-- Ligne 1 : Navigation Date (Les flèches encadrent la date et s'étirent) -->
+                <div style="display: flex; gap: 5px; width: 100%; margin-bottom: 8px;">
+                    <button class="btn-cancel" id="prevDateBtn" style="padding: 0 15px; font-weight: bold; font-size: 1.1rem;">&lt;</button>
+                    <input type="date" id="dateSelect" style="flex-grow: 1; text-align: center;">
+                    <button class="btn-cancel" id="nextDateBtn" style="padding: 0 15px; font-weight: bold; font-size: 1.1rem;">&gt;</button>
+                </div>
+                <!-- Ligne 2 : Actions rapides (Centrées juste en dessous) -->
+                <div style="display: flex; gap: 5px; width: 100%;">
+                    <button class="btn-save" id="todayBtn" onclick="const d = document.getElementById('dateSelect'); if(d) { const now = new Date(); d.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0'); d.dispatchEvent(new Event('change')); }" style="flex: 1; background-color: #4a5568;">Aujourd'hui</button>
+                    <button class="btn-cancel" onclick="window.toggleZoom()" style="flex: 1; border-color: #3182ce; color: #3182ce;" title="Zoom">🔍 Zoom</button>
                 </div>
             </div>
             
