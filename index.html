@@ -620,12 +620,13 @@
             <!-- GESTION DES JOURS FÉRIÉS -->
                 <details style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
                     <summary style="color: #dd6b20; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
-                        📅 Gestion des Jours Fériés
+                        📅 Gestion des Jours Fériés (Annuels)
                     </summary>
                     <div style="padding-top: 5px;">
                         <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                            <input type="date" id="newHolidayDate" style="flex: 1;">
-                            <input type="text" id="newHolidayName" placeholder="Ex: Noël, Fête du travail..." style="flex: 1;">
+                            <!-- NOUVEAU : Champ texte format JJ/MM -->
+                            <input type="text" id="newHolidayDate" placeholder="JJ/MM" maxlength="5" style="width: 80px; text-align: center; font-weight: bold;">
+                            <input type="text" id="newHolidayName" placeholder="Ex: Noël, 1er Mai..." style="flex: 1;">
                             <button class="btn-save" onclick="addHoliday()" style="background-color: #dd6b20; margin: 0;">Ajouter</button>
                         </div>
                         <ul id="holidaysList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto;"></ul>
@@ -1893,6 +1894,24 @@
             const getVal = (id, def = '') => { const el = document.getElementById(id); return el ? el.value : def; };
             const getCheck = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
 
+            const baseDate = getVal('newApptExactDate', new Date().toISOString().split('T')[0]);
+
+            // --- NOUVEAU : VÉRIFICATION DE SÉCURITÉ JOUR FÉRIÉ ---
+            if (baseDate && typeof holidaysConfig !== 'undefined' && holidaysConfig) {
+                const parts = baseDate.split('-');
+                if (parts.length === 3) {
+                    const dayMonth = `${parts[2]}/${parts[1]}`; // Extrait JJ/MM
+                    const holiday = holidaysConfig.find(h => h.date === dayMonth);
+                    if (holiday) {
+                        // Si l'utilisateur clique sur Annuler dans la pop-up, on stoppe tout !
+                        if (!confirm(`⚠️ ATTENTION : Le ${dayMonth} est un jour férié (${holiday.name}).\nVoulez-vous vraiment forcer l'ajout de ce rendez-vous ?`)) {
+                            return; 
+                        }
+                    }
+                }
+            }
+            // -----------------------------------------------------
+
             const phoneLines = document.querySelectorAll('.phone-line');
             const phonesArray = Array.from(phoneLines).map(line => {
                 const num = line.querySelector('.appt-phone-input').value.trim();
@@ -1906,7 +1925,6 @@
             const recurrenceWeeks = parseInt(getVal('newApptRecurrence', '1')) || 1;
             const selectedDays = Array.from(document.querySelectorAll('.recurrence-day:checked')).map(cb => parseInt(cb.value));
             const patientNameStr = getVal('newPatientName').trim() || 'Patient';
-            const baseDate = getVal('newApptExactDate', new Date().toISOString().split('T')[0]);
 
             const baseApptData = {
                 kineId: getVal('newApptKine'), dayIndex: parseInt(getVal('newApptDay') || '0'),
@@ -1977,13 +1995,10 @@
                 });
             }
 
-            // CORRECTION: Rafraîchissement VISUEL immédiat AVANT de sauvegarder
             updatePatientSuggestions(); 
             const mod = document.getElementById('addApptModal');
             if(mod) mod.style.display = 'none'; 
             renderCalendar();
-
-            // Sauvegarde en arrière-plan
             saveData();
         };
 
@@ -2081,17 +2096,27 @@
             } catch(e) { console.error("Exception saveData :", e); }
         };
 
-        // --- GESTION DES JOURS FÉRIÉS ---
+        // --- GESTION DES JOURS FÉRIÉS (FORMAT JJ/MM) ---
         window.addHoliday = function() {
-            const dateVal = document.getElementById('newHolidayDate').value;
+            let dateVal = document.getElementById('newHolidayDate').value.trim();
             const nameVal = document.getElementById('newHolidayName').value.trim() || 'Férié';
-            if(!dateVal) return alert("Veuillez choisir une date.");
-            if(!holidaysConfig) holidaysConfig = [];
             
+            // Vérification de sécurité : Le format doit être exactement 2 chiffres / 2 chiffres
+            if(!/^\d{2}\/\d{2}$/.test(dateVal)) {
+                return alert("Veuillez saisir la date au format JJ/MM (exemple: 25/12 ou 01/05)");
+            }
+            
+            if(!holidaysConfig) holidaysConfig = [];
             if(holidaysConfig.find(h => h.date === dateVal)) return alert("Cette date est déjà enregistrée.");
             
             holidaysConfig.push({ date: dateVal, name: nameVal });
-            holidaysConfig.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            // Tri chronologique simple par mois puis par jour
+            holidaysConfig.sort((a, b) => {
+                const [d1, m1] = a.date.split('/');
+                const [d2, m2] = b.date.split('/');
+                return (m1 + d1).localeCompare(m2 + d2);
+            });
             
             saveData().then(() => {
                 renderHolidaysList();
@@ -2118,9 +2143,8 @@
                 return;
             }
             holidaysConfig.forEach(h => {
-                const frDate = h.date.split('-').reverse().join('/');
                 list.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; background:#fffaf0; padding:6px 10px; border:1px solid #fbd38d; border-radius:4px;">
-                    <span style="color:#dd6b20; font-weight:bold; font-size:0.9rem;">${frDate} - ${h.name}</span>
+                    <span style="color:#dd6b20; font-weight:bold; font-size:0.9rem;">${h.date} - ${h.name}</span>
                     <button class="btn-cancel" onclick="deleteHoliday('${h.date}')" style="padding:2px 8px; font-size:0.75rem; border-color:#e53e3e; color:#e53e3e; margin:0;">X</button>
                 </li>`;
             });
@@ -2250,13 +2274,16 @@
                 const dayCol = document.createElement('div'); dayCol.className = 'day-column';
                 if (!isGlobalOrDouble) dayCol.classList.add('single-practitioner');
 
-                const exactDateStr = weekInfo.fullDates[i]; // L'ID clé de la journée
+                const exactDateStr = weekInfo.fullDates[i]; 
                 const dayNameStr = `${DAYS_FR[i]} ${weekInfo.dates[i]}`;
                 
-                // INDICATEUR JOUR FÉRIÉ SUR LA COLONNE
+                // INDICATEUR JOUR FÉRIÉ (Format JJ/MM)
                 let holidayHtml = '';
                 if (typeof holidaysConfig !== 'undefined' && holidaysConfig) {
-                    const holiday = holidaysConfig.find(h => h.date === exactDateStr);
+                    const dateParts = exactDateStr.split('-');
+                    const dayMonth = `${dateParts[2]}/${dateParts[1]}`; // Transforme YYYY-MM-DD en DD/MM
+                    const holiday = holidaysConfig.find(h => h.date === dayMonth);
+                    
                     if (holiday) {
                         holidayHtml = `<div style="background-color: #fbd38d; color: #dd6b20; font-size: 0.75rem; text-align: center; font-weight: bold; padding: 3px; border-bottom: 1px solid #f6ad55; letter-spacing: 1px;">🌴 FÉRIÉ : ${holiday.name.toUpperCase()}</div>`;
                         dayCol.style.backgroundColor = '#fffaf0'; 
@@ -2268,7 +2295,6 @@
                 if(!isGlobalOrDouble) {
                     const activeK = viewKinesKeys[0];
                     if(activeK && kinesConfig[activeK]) {
-                        // Passe l'exactDateStr pour le réglage ciblé
                         headerHtml += `<button class="btn-day-config" onclick="openDayConfig('${activeK}', ${i}, '${dayNameStr}', '${exactDateStr}')" style="position: absolute; top: 4px; right: 4px; padding: 2px 4px; margin: 0; opacity: 0.7;" title="Horaires du jour">⚙️</button>
                         <div style="margin-top: 5px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
                             <span class="nav-name-link" style="font-size: 0.8rem; color: ${kinesConfig[activeK].color}; cursor: pointer; font-weight: bold; background: ${hexToRgba(kinesConfig[activeK].color, 0.1)}; padding: 2px 8px; border-radius: 4px;" onclick="switchToGlobalView()" title="Retour à la vue globale">⬅ ${getKineDisplayName(activeK, exactDateStr)}</span>
