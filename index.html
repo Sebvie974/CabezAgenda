@@ -616,6 +616,21 @@
                     <button class="btn-cancel" onclick="document.getElementById('importFile').click()" style="flex: 1;">Restaurer JSON</button>
                 </div>
             </div>
+
+            <!-- GESTION DES JOURS FÉRIÉS -->
+                <details style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                    <summary style="color: #dd6b20; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
+                        📅 Gestion des Jours Fériés
+                    </summary>
+                    <div style="padding-top: 5px;">
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <input type="date" id="newHolidayDate" style="flex: 1;">
+                            <input type="text" id="newHolidayName" placeholder="Ex: Noël, Fête du travail..." style="flex: 1;">
+                            <button class="btn-save" onclick="addHoliday()" style="background-color: #dd6b20; margin: 0;">Ajouter</button>
+                        </div>
+                        <ul id="holidaysList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto;"></ul>
+                    </div>
+                </details>
             
             <!-- BOUTONS D'ACTION (AVEC SUPPRESSION) -->
             <div class="modal-actions" style="margin-top: 20px; justify-content: space-between;">
@@ -629,23 +644,30 @@
     </div>
 
     <!-- MODALE : HORAIRES DU JOUR SPÉCIFIQUE -->
-    <div class="modal-overlay" id="dayConfigModal">
-        <div class="modal-content" style="width: 350px;">
+    <div class="modal-overlay" id="dayConfigModal" style="display: none;">
+        <div class="modal-content" style="width: 380px;">
             <div style="margin-bottom: 15px;"><h3 id="dayModalTitle" style="margin-bottom: 0;">Horaires du Jour</h3></div>
             <div class="modal-body">
-                <input type="hidden" id="dayModalKine"><input type="hidden" id="dayModalDay">
+                <input type="hidden" id="dayModalKine"><input type="hidden" id="dayModalDay"><input type="hidden" id="dayModalExactDate">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="control-group"><label>Arrivée</label><input type="time" id="dayStart"></div>
                     <div class="control-group"><label>Départ</label><input type="time" id="dayEnd"></div>
                     <div class="control-group"><label>Début Pause</label><input type="time" id="dayPauseStart"></div>
                     <div class="control-group"><label>Fin Pause</label><input type="time" id="dayPauseEnd"></div>
                 </div>
+                <div class="control-group" style="margin-top: 15px; border-top: 1px dashed #cbd5e0; padding-top: 10px;">
+                    <label style="color: #2b6cb0;">Portée de ce réglage :</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; margin-top: 5px;">
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;"><input type="radio" name="dayConfigScope" value="specific" checked style="width:16px;height:16px;"> Uniquement le <span id="dayModalDateText" style="font-weight:bold;"></span></label>
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;"><input type="radio" name="dayConfigScope" value="global" style="width:16px;height:16px;"> Tous les <span id="dayModalDayText" style="font-weight:bold;"></span>s (Global)</label>
+                    </div>
+                </div>
             </div>
-            <div class="modal-actions" style="justify-content: space-between;">
-                <button class="btn-cancel" id="resetDayBtn" style="border-color: #e53e3e; color: #e53e3e;">Réinitialiser</button>
-                <div>
+            <div class="modal-actions" style="justify-content: space-between; margin-top: 15px;">
+                <button class="btn-cancel" id="resetDayBtn" onclick="resetDayConfiguration()" style="border-color: #e53e3e; color: #e53e3e;">Réinitialiser</button>
+                <div style="display: flex; gap: 10px;">
                     <button class="btn-cancel" onclick="document.getElementById('dayConfigModal').style.display='none'">Fermer</button>
-                    <button class="btn-save" id="saveDayBtn">Valider</button>
+                    <button class="btn-save" id="saveDayBtn" onclick="saveDayConfiguration()">Valider</button>
                 </div>
             </div>
         </div>
@@ -853,78 +875,7 @@
         let statusConfig = {};
 
         // --- CHARGEMENT ASYNCHRONE BDD ---
-        async function loadDataFromSupabase() {
-            try {
-                const { data: configData, error: configError } = await supabaseClient.from('app_config').select('*');
-                if (configError) console.error("Erreur config:", configError);
-                
-                if (configData && configData.length > 0) {
-                    configData.forEach(row => {
-                        if (row.key === 'kinesConfig') kinesConfig = row.data;
-                        if (row.key === 'apptTypesConfig') apptTypesConfig = row.data;
-                        if (row.key === 'statusConfig') statusConfig = row.data;
-                    });
-                }
-
-                const { data: apptData, error: apptError } = await supabaseClient.from('appointments').select('*');
-                if (apptError) console.error("Erreur RDV:", apptError);
-                
-                if (apptData) {
-                    appointments = apptData.map(row => ({
-                        id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
-                        timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
-                        apptType: row.appt_type, status: row.status, isImportant: row.is_important,
-                        isFirstVisit: row.is_first_visit, isLastVisit: row.is_last_visit, isCV: row.is_cv,
-                        remainingSessions: row.remaining_sessions, phones: row.phones, vegaPointed: row.vega_pointed,
-                        type: row.patient === 'Indisponible' ? 'unavailable' : 'rdv' // <-- Restaure le bloc gris
-                    }));
-                }
-            } catch (error) {
-                console.error("Erreur de chargement Supabase:", error);
-            }
-        }
-
-        // --- SAUVEGARDE ASYNCHRONE VERS SUPABASE ---
-        window.saveData = async function() {
-            try {
-                await supabaseClient.from('app_config').upsert([
-                    { key: 'kinesConfig', data: kinesConfig },
-                    { key: 'apptTypesConfig', data: apptTypesConfig },
-                    { key: 'statusConfig', data: statusConfig }
-                ]);
-
-                if (appointments && appointments.length > 0) {
-                    const apptsToSave = appointments.map(a => ({
-                        id: a.id,
-                        kine_id: a.kineId,
-                        day_index: a.dayIndex,
-                        exact_date: a.exactDate,
-                        time_str: a.timeStr,
-                        duration: a.duration,
-                        patient: a.patient,
-                        note: a.note,
-                        appt_type: a.apptType,
-                        status: a.status,
-                        is_important: a.isImportant || false,
-                        is_first_visit: a.isFirstVisit || false,
-                        is_last_visit: a.isLastVisit || false,
-                        is_cv: a.isCV || false,
-                        remaining_sessions: a.remainingSessions || null,
-                        phones: a.phones || [],
-                        vega_pointed: a.vegaPointed || false
-                    }));
-                    
-                    const { error } = await supabaseClient.from('appointments').upsert(apptsToSave);
-                    // NOUVEAU : Si Supabase bloque, on affiche l'erreur en grand !
-                    if (error) {
-                        console.error("Erreur critique de sauvegarde :", error);
-                        alert("Erreur de sauvegarde Supabase : " + error.message);
-                    }
-                }
-            } catch(e) {
-                console.error("Exception saveData :", e);
-            }
-        };
+        
 
         function updateStatusSelectLabels() {
             const select = document.getElementById('newApptStatus');
@@ -979,11 +930,6 @@
             let r = 0, g = 0, b = 0;
             if (hex.length === 7) { r = parseInt(hex.slice(1, 3), 16); g = parseInt(hex.slice(3, 5), 16); b = parseInt(hex.slice(5, 7), 16); }
             return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        }
-        function getDailySchedule(kineId, dayIndex) {
-            const config = kinesConfig[kineId];
-            if (config.schedule && config.schedule[dayIndex]) return config.schedule[dayIndex];
-            return { start: config.start, end: config.end, pauseStart: config.pauseStart, pauseEnd: config.pauseEnd };
         }
         function getTopPosition(timeStr) {
             const [h, m] = timeStr.split(':').map(Number);
@@ -1639,32 +1585,6 @@
             await saveData();
         }
 
-        // --- GESTION JOUR SPÉCIFIQUE ---
-        window.openDayConfig = function(kineId, dayIndex, dayNameStr) {
-            const schedule = getDailySchedule(kineId, dayIndex);
-            document.getElementById('dayModalKine').value = kineId;
-            document.getElementById('dayModalDay').value = dayIndex;
-            document.getElementById('dayStart').value = floatToTime(schedule.start);
-            document.getElementById('dayEnd').value = floatToTime(schedule.end);
-            document.getElementById('dayPauseStart').value = floatToTime(schedule.pauseStart);
-            document.getElementById('dayPauseEnd').value = floatToTime(schedule.pauseEnd);
-            document.getElementById('dayModalTitle').textContent = `Horaires : ${kinesConfig[kineId].name} (${dayNameStr})`;
-            dayConfigModal.style.display = 'flex';
-        };
-
-        async function saveDayConfiguration() {
-            const kId = document.getElementById('dayModalKine').value;
-            const dayIdx = parseInt(document.getElementById('dayModalDay').value);
-            if(!kinesConfig[kId].schedule) kinesConfig[kId].schedule = {};
-            kinesConfig[kId].schedule[dayIdx] = {
-                start: timeToFloat(document.getElementById('dayStart').value), end: timeToFloat(document.getElementById('dayEnd').value),
-                pauseStart: timeToFloat(document.getElementById('dayPauseStart').value), pauseEnd: timeToFloat(document.getElementById('dayPauseEnd').value)
-            };
-            await saveData(); 
-            dayConfigModal.style.display = 'none'; 
-            renderCalendar();
-        }
-
         async function resetDayConfiguration() {
             const kId = document.getElementById('dayModalKine').value;
             const dayIdx = parseInt(document.getElementById('dayModalDay').value);
@@ -2085,14 +2005,194 @@
             return { dates, fullDates };
         }
 
+        let holidaysConfig = []; // NOUVEAU : Base de données des jours fériés
+
+        // --- SAUVEGARDE ET CHARGEMENT ---
+        async function loadDataFromSupabase() {
+            try {
+                const { data: configData, error: configError } = await supabaseClient.from('app_config').select('*');
+                if (configData && configData.length > 0) {
+                    configData.forEach(row => {
+                        if (row.key === 'kinesConfig') kinesConfig = row.data;
+                        if (row.key === 'apptTypesConfig') apptTypesConfig = row.data;
+                        if (row.key === 'statusConfig') statusConfig = row.data;
+                        if (row.key === 'holidaysConfig') holidaysConfig = row.data; // Charge les jours fériés
+                    });
+                }
+                const { data: apptData } = await supabaseClient.from('appointments').select('*');
+                if (apptData) {
+                    appointments = apptData.map(row => ({
+                        id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
+                        timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
+                        apptType: row.appt_type, status: row.status, isImportant: row.is_important,
+                        isFirstVisit: row.is_first_visit, isLastVisit: row.is_last_visit, isCV: row.is_cv,
+                        remainingSessions: row.remaining_sessions, phones: row.phones, vegaPointed: row.vega_pointed,
+                        type: row.patient === 'Indisponible' ? 'unavailable' : 'rdv'
+                    }));
+                }
+            } catch (error) { console.error("Erreur de chargement Supabase:", error); }
+        }
+
+        window.saveData = async function() {
+            try {
+                await supabaseClient.from('app_config').upsert([
+                    { key: 'kinesConfig', data: kinesConfig },
+                    { key: 'apptTypesConfig', data: apptTypesConfig },
+                    { key: 'statusConfig', data: statusConfig },
+                    { key: 'holidaysConfig', data: holidaysConfig } // Sauvegarde les jours fériés
+                ]);
+                if (appointments && appointments.length > 0) {
+                    const apptsToSave = appointments.map(a => ({
+                        id: a.id, kine_id: a.kineId, day_index: a.dayIndex, exact_date: a.exactDate,
+                        time_str: a.timeStr, duration: a.duration, patient: a.patient, note: a.note,
+                        appt_type: a.apptType, status: a.status, is_important: a.isImportant || false,
+                        is_first_visit: a.isFirstVisit || false, is_last_visit: a.isLastVisit || false,
+                        is_cv: a.isCV || false, remaining_sessions: a.remainingSessions || null,
+                        phones: a.phones || [], vega_pointed: a.vegaPointed || false
+                    }));
+                    await supabaseClient.from('appointments').upsert(apptsToSave);
+                }
+            } catch(e) { console.error("Exception saveData :", e); }
+        };
+
+        // --- GESTION DES JOURS FÉRIÉS ---
+        window.addHoliday = function() {
+            const dateVal = document.getElementById('newHolidayDate').value;
+            const nameVal = document.getElementById('newHolidayName').value.trim() || 'Férié';
+            if(!dateVal) return alert("Veuillez choisir une date.");
+            if(!holidaysConfig) holidaysConfig = [];
+            
+            if(holidaysConfig.find(h => h.date === dateVal)) return alert("Cette date est déjà enregistrée.");
+            
+            holidaysConfig.push({ date: dateVal, name: nameVal });
+            holidaysConfig.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            saveData().then(() => {
+                renderHolidaysList();
+                if(typeof renderCalendar === 'function') renderCalendar();
+            });
+            document.getElementById('newHolidayDate').value = '';
+            document.getElementById('newHolidayName').value = '';
+        };
+
+        window.deleteHoliday = function(dateVal) {
+            holidaysConfig = holidaysConfig.filter(h => h.date !== dateVal);
+            saveData().then(() => {
+                renderHolidaysList();
+                if(typeof renderCalendar === 'function') renderCalendar();
+            });
+        };
+
+        window.renderHolidaysList = function() {
+            const list = document.getElementById('holidaysList');
+            if(!list) return;
+            list.innerHTML = '';
+            if(!holidaysConfig || holidaysConfig.length === 0) {
+                list.innerHTML = '<li style="color:#718096; font-size:0.85rem;">Aucun jour férié configuré.</li>';
+                return;
+            }
+            holidaysConfig.forEach(h => {
+                const frDate = h.date.split('-').reverse().join('/');
+                list.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; background:#fffaf0; padding:6px 10px; border:1px solid #fbd38d; border-radius:4px;">
+                    <span style="color:#dd6b20; font-weight:bold; font-size:0.9rem;">${frDate} - ${h.name}</span>
+                    <button class="btn-cancel" onclick="deleteHoliday('${h.date}')" style="padding:2px 8px; font-size:0.75rem; border-color:#e53e3e; color:#e53e3e; margin:0;">X</button>
+                </li>`;
+            });
+        };
+
+        // Lie l'affichage des jours fériés à l'ouverture de la configuration admin
+        setTimeout(() => {
+            const btn = document.getElementById('openAdminBtn');
+            if(btn) btn.addEventListener('click', () => { if(typeof renderHolidaysList === 'function') renderHolidaysList(); });
+        }, 1000);
+
+        // --- GESTION DES HORAIRES PAR JOUR (RÉGLAGE SPÉCIFIQUE ET GLOBAL) ---
+        window.getDailySchedule = function(kineId, dayIndex, exactDate) {
+            const config = kinesConfig[kineId];
+            // 1. Cherche si la journée a été spécifiquement modifiée (ex: "vendredi 6 nov uniquement")
+            if (exactDate && config.specificSchedules && config.specificSchedules[exactDate]) {
+                return config.specificSchedules[exactDate];
+            }
+            // 2. Sinon cherche si c'est un réglage global pour ce jour de la semaine (ex: "tous les vendredis")
+            if (config.schedule && config.schedule[dayIndex]) {
+                return config.schedule[dayIndex];
+            }
+            // 3. Sinon, horaires par défaut du kiné
+            return { start: config.start, end: config.end, pauseStart: config.pauseStart, pauseEnd: config.pauseEnd };
+        };
+
+        window.openDayConfig = function(kineId, dayIndex, dayNameStr, exactDate) {
+            const schedule = getDailySchedule(kineId, dayIndex, exactDate);
+            document.getElementById('dayModalKine').value = kineId;
+            document.getElementById('dayModalDay').value = dayIndex;
+            document.getElementById('dayModalExactDate').value = exactDate; // Mémorise la date exacte
+            
+            const frDate = exactDate.split('-').reverse().join('/');
+            document.getElementById('dayModalDateText').innerText = frDate;
+            document.getElementById('dayModalDayText').innerText = DAYS_FR[dayIndex];
+            
+            document.getElementById('dayStart').value = floatToTime(schedule.start);
+            document.getElementById('dayEnd').value = floatToTime(schedule.end);
+            document.getElementById('dayPauseStart').value = floatToTime(schedule.pauseStart);
+            document.getElementById('dayPauseEnd').value = floatToTime(schedule.pauseEnd);
+            document.getElementById('dayModalTitle').textContent = `Horaires : ${kinesConfig[kineId].name}`;
+            document.getElementById('dayConfigModal').style.display = 'flex';
+        };
+
+        window.saveDayConfiguration = async function() {
+            const kId = document.getElementById('dayModalKine').value;
+            const dayIdx = parseInt(document.getElementById('dayModalDay').value);
+            const exactDate = document.getElementById('dayModalExactDate').value;
+            
+            // Vérifie quel bouton radio a été coché
+            const scopeRadio = document.querySelector('input[name="dayConfigScope"]:checked');
+            const scope = scopeRadio ? scopeRadio.value : 'specific';
+            
+            const newSchedule = {
+                start: timeToFloat(document.getElementById('dayStart').value), 
+                end: timeToFloat(document.getElementById('dayEnd').value),
+                pauseStart: timeToFloat(document.getElementById('dayPauseStart').value), 
+                pauseEnd: timeToFloat(document.getElementById('dayPauseEnd').value)
+            };
+
+            if(!kinesConfig[kId].schedule) kinesConfig[kId].schedule = {};
+            if(!kinesConfig[kId].specificSchedules) kinesConfig[kId].specificSchedules = {};
+
+            if (scope === 'specific') kinesConfig[kId].specificSchedules[exactDate] = newSchedule;
+            else kinesConfig[kId].schedule[dayIdx] = newSchedule;
+            
+            if (typeof saveData === 'function') await saveData(); 
+            document.getElementById('dayConfigModal').style.display = 'none'; 
+            if (typeof renderCalendar === 'function') renderCalendar();
+        };
+
+        window.resetDayConfiguration = async function() {
+            const kId = document.getElementById('dayModalKine').value;
+            const dayIdx = parseInt(document.getElementById('dayModalDay').value);
+            const exactDate = document.getElementById('dayModalExactDate').value;
+            
+            const scopeRadio = document.querySelector('input[name="dayConfigScope"]:checked');
+            const scope = scopeRadio ? scopeRadio.value : 'specific';
+            
+            if (scope === 'specific') {
+                if(kinesConfig[kId].specificSchedules) delete kinesConfig[kId].specificSchedules[exactDate];
+            } else {
+                if(kinesConfig[kId].schedule) delete kinesConfig[kId].schedule[dayIdx];
+            }
+
+            if (typeof saveData === 'function') await saveData(); 
+            document.getElementById('dayConfigModal').style.display = 'none'; 
+            if (typeof renderCalendar === 'function') renderCalendar();
+        };
+
+        // --- AFFICHAGE MIS À JOUR (JOURS FÉRIÉS & TRANSMISSION DE LA DATE) ---
         window.renderCalendar = function() {
             if (typeof renderTimeAxis === 'function') renderTimeAxis(); 
             const practitionerFilter = document.getElementById('practitionerFilter');
             
-            // Intercepte le choix dans le menu et force l'ouverture de la modale auto-générée
             if (practitionerFilter && practitionerFilter.value === 'double_view_setup') {
                 window.openDoubleViewModal();
-                practitionerFilter.value = 'all'; // Repasse sur la vue globale en fond pendant qu'on choisit
+                practitionerFilter.value = 'all'; 
             }
 
             const dateSelect = document.getElementById('dateSelect');
@@ -2101,7 +2201,6 @@
             
             const selectedKine = practitionerFilter ? practitionerFilter.value : 'all';
             const isMobile = window.innerWidth <= 768;
-            
             const isGlobalOrDouble = selectedKine === 'all' || selectedKine.startsWith('double_');
             
             let currentDayIndex = new Date(dateSelect.value).getDay(); 
@@ -2117,29 +2216,36 @@
             const allActiveTitulars = Object.keys(kinesConfig).filter(k => kinesConfig[k].isActive !== false && !kinesConfig[k].isSubstitute);
             let viewKinesKeys = [];
             
-            if (selectedKine === 'all') {
-                viewKinesKeys = allActiveTitulars;
-            } else if (selectedKine.startsWith('double_')) {
-                const parts = selectedKine.split('_');
-                viewKinesKeys = [parts[1], parts[2]].filter(k => kinesConfig[k]);
-            } else {
-                viewKinesKeys = [selectedKine];
-            }
+            if (selectedKine === 'all') viewKinesKeys = allActiveTitulars;
+            else if (selectedKine.startsWith('double_')) viewKinesKeys = [selectedKine.split('_')[1], selectedKine.split('_')[2]].filter(k => kinesConfig[k]);
+            else viewKinesKeys = [selectedKine];
 
             for (let i = startDay; i < endDay; i++) {
                 const dayCol = document.createElement('div'); dayCol.className = 'day-column';
                 if (!isGlobalOrDouble) dayCol.classList.add('single-practitioner');
 
+                const exactDateStr = weekInfo.fullDates[i]; // L'ID clé de la journée
                 const dayNameStr = `${DAYS_FR[i]} ${weekInfo.dates[i]}`;
-                let headerHtml = `<div class="day-header">
-                    <span class="day-name">${dayNameStr}</span>`;
+                
+                // INDICATEUR JOUR FÉRIÉ SUR LA COLONNE
+                let holidayHtml = '';
+                if (typeof holidaysConfig !== 'undefined' && holidaysConfig) {
+                    const holiday = holidaysConfig.find(h => h.date === exactDateStr);
+                    if (holiday) {
+                        holidayHtml = `<div style="background-color: #fbd38d; color: #dd6b20; font-size: 0.75rem; text-align: center; font-weight: bold; padding: 3px; border-bottom: 1px solid #f6ad55; letter-spacing: 1px;">🌴 FÉRIÉ : ${holiday.name.toUpperCase()}</div>`;
+                        dayCol.style.backgroundColor = '#fffaf0'; 
+                    }
+                }
+
+                let headerHtml = `${holidayHtml}<div class="day-header"><span class="day-name">${dayNameStr}</span>`;
                 
                 if(!isGlobalOrDouble) {
                     const activeK = viewKinesKeys[0];
                     if(activeK && kinesConfig[activeK]) {
-                        headerHtml += `<button class="btn-day-config" onclick="openDayConfig('${activeK}', ${i}, '${dayNameStr}')" style="position: absolute; top: 4px; right: 4px; padding: 2px 4px; margin: 0; opacity: 0.7;" title="Horaires du jour">⚙️</button>
+                        // Passe l'exactDateStr pour le réglage ciblé
+                        headerHtml += `<button class="btn-day-config" onclick="openDayConfig('${activeK}', ${i}, '${dayNameStr}', '${exactDateStr}')" style="position: absolute; top: 4px; right: 4px; padding: 2px 4px; margin: 0; opacity: 0.7;" title="Horaires du jour">⚙️</button>
                         <div style="margin-top: 5px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                            <span class="nav-name-link" style="font-size: 0.8rem; color: ${kinesConfig[activeK].color}; cursor: pointer; font-weight: bold; background: ${hexToRgba(kinesConfig[activeK].color, 0.1)}; padding: 2px 8px; border-radius: 4px;" onclick="switchToGlobalView()" title="Retour à la vue globale">⬅ ${getKineDisplayName(activeK, weekInfo.fullDates[i])}</span>
+                            <span class="nav-name-link" style="font-size: 0.8rem; color: ${kinesConfig[activeK].color}; cursor: pointer; font-weight: bold; background: ${hexToRgba(kinesConfig[activeK].color, 0.1)}; padding: 2px 8px; border-radius: 4px;" onclick="switchToGlobalView()" title="Retour à la vue globale">⬅ ${getKineDisplayName(activeK, exactDateStr)}</span>
                         </div>`;
                     }
                 }
@@ -2150,8 +2256,8 @@
                     viewKinesKeys.forEach(key => {
                         const kine = kinesConfig[key];
                         headerHtml += `<div style="color: ${kine.color};">
-                            <span class="nav-name-link" style="cursor: pointer; font-weight: bold;" onclick="switchToSingleView('${key}')" title="Voir l'agenda de ${kine.name} uniquement">${getKineDisplayName(key, weekInfo.fullDates[i])}</span> 
-                            <button class="btn-day-config" onclick="openDayConfig('${key}', ${i}, '${dayNameStr}')" style="position: absolute; right: 2px; margin: 0; padding: 0; opacity: 0.4;">⚙️</button>
+                            <span class="nav-name-link" style="cursor: pointer; font-weight: bold;" onclick="switchToSingleView('${key}')" title="Voir l'agenda de ${kine.name} uniquement">${getKineDisplayName(key, exactDateStr)}</span> 
+                            <button class="btn-day-config" onclick="openDayConfig('${key}', ${i}, '${dayNameStr}', '${exactDateStr}')" style="position: absolute; right: 2px; margin: 0; padding: 0; opacity: 0.4;">⚙️</button>
                         </div>`;
                     });
                     headerHtml += `</div>`;
@@ -2163,11 +2269,11 @@
 
                 if (!isMobile && isGlobalOrDouble) {
                     viewKinesKeys.forEach(kId => {
-                        if(kinesConfig[kId]) subGrid.appendChild(createKineColumn(kId, i, weekInfo.fullDates[i]));
+                        if(kinesConfig[kId]) subGrid.appendChild(createKineColumn(kId, i, exactDateStr));
                     });
                 } else {
                     const activeKine = viewKinesKeys[0];
-                    if(activeKine && kinesConfig[activeKine]) subGrid.appendChild(createKineColumn(activeKine, i, weekInfo.fullDates[i]));
+                    if(activeKine && kinesConfig[activeKine]) subGrid.appendChild(createKineColumn(activeKine, i, exactDateStr));
                 }
 
                 dayCol.appendChild(subGrid); daysWrapper.appendChild(dayCol);
@@ -2177,7 +2283,6 @@
         function createKineColumn(kineId, dayIndex, exactDate) {
             const config = kinesConfig[kineId], col = document.createElement('div');
             col.className = 'practitioner-column'; 
-            // NOUVEAU : Hauteur calculée dynamiquement selon le niveau de zoom
             col.style.height = `${(END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE}px`;
 
             const gapPx = config.slotDuration * PIXELS_PER_MINUTE; 
@@ -2216,7 +2321,9 @@
                 openAddModal(kineId, dayIndex, `${(Math.floor(snappedMins / 60) + START_HOUR).toString().padStart(2,'0')}:${(snappedMins % 60).toString().padStart(2, '0')}`, exactDate);
             });
 
-            const daySchedule = getDailySchedule(kineId, dayIndex);
+            // VÉRIFICATION DE LA DATE EXACTE POUR DESSINER LES BLOCS GÉRÉS (PAUSE, DEBUT, FIN)
+            const daySchedule = getDailySchedule(kineId, dayIndex, exactDate);
+            
             const drawBlock = (s, e) => {
                 if (s >= e) return;
                 const b = document.createElement('div'); b.className = 'unavailable-block';
@@ -2253,7 +2360,6 @@
                         el.style.height = `${appt.duration * PIXELS_PER_MINUTE}px`;
                         el.style.width = `calc(${100 / count}% - 8px)`;
                         el.style.left = `calc(${index * (100 / count)}% + 4px)`;
-                        
                         el.innerHTML = `<span style="font-size: 0.7rem; font-weight: bold; color: #718096; padding: 4px; display: block; text-align: center; margin-top: ${appt.duration < 30 ? '-2px' : '0'}; pointer-events: none;">Bloqué</span>`;
                         
                         el.addEventListener('click', async (e) => { 
@@ -2270,12 +2376,10 @@
                         if (appt.vegaPointed) el.classList.add('is-pointed');
 
                         let isPast = false;
-                        if (exactDate < currentYMD) {
-                            isPast = true;
-                        } else if (exactDate === currentYMD) {
+                        if (exactDate < currentYMD) isPast = true;
+                        else if (exactDate === currentYMD) {
                             const [h, m] = appt.timeStr.split(':').map(Number);
-                            const apptEndMins = (h * 60) + m + appt.duration;
-                            if (currentMins >= apptEndMins) isPast = true;
+                            if (currentMins >= ((h * 60) + m + appt.duration)) isPast = true;
                         }
                         
                         el.style.top = `${getTopPosition(appt.timeStr)}px`; 
@@ -2307,7 +2411,6 @@
                         if (appt.isImportant) iconHtml += '<span class="note-icon">⚠️</span>';
                         if (appt.isLastVisit) iconHtml += '<span class="note-icon">🛑</span>';
                         if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) iconHtml += '<span class="note-icon">⏳</span>';
-                        
                         if (appt.note && appt.note.trim().length > 0) iconHtml += '<span class="note-icon">📝</span>';
 
                         let cvIconHtml = appt.isCV ? '<span class="note-icon" style="background-color: #38a169; color: white; padding: 1px 4px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; border: 1px solid #276749;">CV</span>' : '';
@@ -2325,12 +2428,9 @@
                             if (appt.status === 'no_show') {
                                 displayPatientName = `(${appt.patient})`;
                                 if (!isPast) boxOpacity = '0.5'; 
-                            } else if (appt.status === 'cancelled_today') {
+                            } else if (appt.status === 'cancelled_today' || appt.status === 'cancelled_24h') {
                                 textDeco = 'line-through';
-                                if (!isPast) boxOpacity = '0.5';
-                            } else if (appt.status === 'cancelled_24h') {
-                                textDeco = 'line-through'; 
-                                prefix += `<span style="background-color: #718096; color: white; padding: 0 4px; border-radius: 3px; font-size: 0.6rem; font-weight: bold; margin-right: 4px;" title="Annulé 24h avant">24</span>`;
+                                if (appt.status === 'cancelled_24h') prefix += `<span style="background-color: #718096; color: white; padding: 0 4px; border-radius: 3px; font-size: 0.6rem; font-weight: bold; margin-right: 4px;" title="Annulé 24h avant">24</span>`;
                                 if (!isPast) boxOpacity = '0.5';
                             }
                         }
@@ -2357,9 +2457,7 @@
                                 if (idx !== -1) appointments[idx].vegaPointed = appt.vegaPointed;
                                 saveData();
                                 renderCalendar();
-                            } else {
-                                openEditModal(appt.id); 
-                            }
+                            } else openEditModal(appt.id); 
                         });
                     }
                     col.appendChild(el);
@@ -2370,8 +2468,7 @@
                 const isOccupied = dailyAppts.some(a => {
                     if (!a.timeStr) return false;
                     const [h, min] = a.timeStr.split(':').map(Number);
-                    const aStart = h * 60 + min;
-                    return m >= aStart && m < (aStart + a.duration);
+                    return m >= (h * 60 + min) && m < ((h * 60 + min) + a.duration);
                 });
                 
                 if (!isOccupied) {
