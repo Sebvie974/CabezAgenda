@@ -2662,7 +2662,6 @@
             }
         };
 
-        // 3. Fonction Historique (Filtrée sur l'avenir et Colorisée)
         window.openPatientHistoryGlobal = function(patientName) {
             if (!patientName) return;
 
@@ -2689,13 +2688,23 @@
                 histContent.innerHTML = "<p style='padding: 10px; color: #718096;'>Aucun rendez-vous à venir trouvé pour ce patient.</p>";
             } else {
                 let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 5px;">';
+                
+                // Tableau pour traduire le jour de la semaine
+                const joursFr = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+
                 patAppts.forEach(appt => {
                     const kineObj = kinesConfig[appt.kineId];
                     const kineName = kineObj ? kineObj.name : 'Inconnu';
                     const kineColor = kineObj ? kineObj.color : '#718096';
                     
                     const dParts = appt.exactDate.split('-');
-                    const frDate = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : appt.exactDate;
+                    let frDate = appt.exactDate;
+                    
+                    if (dParts.length === 3) {
+                        const dateObj = new Date(appt.exactDate);
+                        const nomJour = joursFr[dateObj.getDay()]; // Récupère le nom du jour
+                        frDate = `${nomJour} ${dParts[2]}/${dParts[1]}/${dParts[0]}`;
+                    }
 
                     html += `
                     <div style="background-color: ${kineColor}; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
