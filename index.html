@@ -705,7 +705,10 @@
                 <button class="btn-save" id="toggleSecretariatBtn" style="background-color: #805ad5; height: 38px; margin: 0; padding: 0 12px;">📠 Pointage</button>
                 <button class="btn-save" onclick="window.openSubstitutesModal()" style="background-color: #e53e3e; height: 38px; margin: 0; padding: 0 12px;" title="Gérer les remplacements">🤝 Remplaçants</button>
                 <button class="btn-save" id="openAdminBtn" style="background-color: #4a5568; height: 38px; margin: 0; padding: 0 12px;">⚙️ Config</button>
-                <button class="btn-save" onclick="openNotesModal()" style="background-color: #d69e2e; height: 38px; margin: 0; padding: 0 12px;" title="Notes du Cabinet">📝 Notes</button>
+                <button class="btn-save" onclick="openNotesModal()" style="background-color: #d69e2e; height: 38px; margin: 0; padding: 0 15px; position: relative;" title="Notes du Cabinet">
+    📝 Notes
+    <span id="notesBadge" style="display: none; position: absolute; top: -6px; right: -6px; background-color: #e53e3e; color: white; border-radius: 50%; font-size: 0.7rem; font-weight: bold; border: 2px solid #2d3748; align-items: center; justify-content: center; min-width: 20px; height: 20px; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">0</span>
+</button>
                 <button class="btn-cancel" onclick="forceAppUpdate()" style="border-color: #ecc94b; color: #d69e2e; height: 38px; margin: 0; padding: 0 8px;" title="Forcer la mise à jour">🔄</button>
                 <button class="btn-save" onclick="document.getElementById('profileModal').style.display='flex'" style="background-color: #3182ce; height: 38px; margin: 0; padding: 0 8px;" title="Mon Profil">🔑</button>
                 <button class="btn-cancel" onclick="logoutUser()" style="border-color: #e53e3e; color: #e53e3e; height: 38px; margin: 0; padding: 0 8px;" title="Se déconnecter">🚪</button>
@@ -1077,7 +1080,6 @@
         let cabinetNotes = [];
 
         window.openNotesModal = async function() {
-            // Affiche la modale et charge les notes en temps réel depuis Supabase
             document.getElementById('notesModal').style.display = 'flex';
             await loadCabinetNotes();
         };
@@ -1091,6 +1093,7 @@
             if (data) {
                 cabinetNotes = data;
                 renderNotes();
+                updateNotesBadge();
             }
         }
 
@@ -1107,6 +1110,7 @@
                 cabinetNotes.unshift(data[0]);
                 document.getElementById('newNoteText').value = '';
                 renderNotes();
+                updateNotesBadge();
             }
         };
 
@@ -1122,6 +1126,7 @@
                 if (!error) {
                     note.archived = newStatus;
                     renderNotes();
+                    updateNotesBadge();
                 }
             }
         };
@@ -1136,13 +1141,17 @@
                 if (!error) {
                     cabinetNotes = cabinetNotes.filter(n => n.id !== id);
                     renderNotes();
+                    updateNotesBadge();
                 }
             }
         };
 
         window.renderNotes = function() {
             const listEl = document.getElementById('notesList');
-            const showArchived = document.getElementById('showArchivedNotes').checked;
+            if(!listEl) return;
+            
+            const showArchivedBox = document.getElementById('showArchivedNotes');
+            const showArchived = showArchivedBox ? showArchivedBox.checked : false;
             listEl.innerHTML = '';
             
             const filtered = cabinetNotes.filter(n => showArchived || !n.archived);
@@ -1173,6 +1182,23 @@
                 `;
             });
         };
+
+        window.updateNotesBadge = function() {
+            const badge = document.getElementById('notesBadge');
+            if (!badge) return;
+            const activeCount = cabinetNotes.filter(n => !n.archived).length;
+            if (activeCount > 0) {
+                badge.innerText = activeCount;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        };
+
+        // Force le chargement silencieux des notes au démarrage pour afficher la pastille
+        setTimeout(() => { 
+            if (typeof loadCabinetNotes === 'function') loadCabinetNotes(); 
+        }, 2000);
 
         // Fonction pour recaler la date au Lundi de la semaine en cours
         function snapToMonday(dateStr) {
