@@ -814,6 +814,28 @@
         </div>
     </div>
 
+    <!-- MODALE : VUE DOUBLE PERSONNALISÉE -->
+    <div class="modal-overlay" id="doubleViewModal" style="display: none;">
+        <div class="modal-content" style="width: 400px; max-width: 95vw;">
+            <h3 style="color: #2b6cb0; margin-bottom: 15px;">👥 Créer une Vue Double</h3>
+            <div class="modal-body">
+                <p style="font-size: 0.9rem; color: #4a5568; margin-bottom: 15px;">Sélectionnez les 2 kinés à afficher côte à côte :</p>
+                <div class="control-group">
+                    <label>Praticien (Colonne de gauche)</label>
+                    <select id="doubleKine1"></select>
+                </div>
+                <div class="control-group">
+                    <label>Praticien (Colonne de droite)</label>
+                    <select id="doubleKine2"></select>
+                </div>
+                <button class="btn-save" onclick="applyDoubleView()" style="width: 100%; margin-top: 10px; background-color: #3182ce;">Afficher le duo</button>
+            </div>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button class="btn-cancel" onclick="document.getElementById('doubleViewModal').style.display='none'" style="width: 100%;">Annuler</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- CONFIGURATION & SUPABASE ---
         const supabaseUrl = 'https://arqjpikvihnduggbwhxz.supabase.co'; // À RENSEIGNER
@@ -1388,22 +1410,76 @@
             let activeTitularsHtml = '';
             
             for (const [key, kine] of Object.entries(kinesConfig)) {
-                // L'admin voit tout le monde pour pouvoir les configurer
                 adminHtml += `<option value="${key}">${kine.name}</option>`; 
                 
-                // Le planning et les créations de RDV ne listent QUE les titulaires actifs (Pas de remplaçants)
                 if (kine.isActive !== false && !kine.isSubstitute) {
                     filterHtml += `<option value="${key}">${kine.name}</option>`;
                     activeTitularsHtml += `<option value="${key}">${kine.name}</option>`;
                 }
             }
             
+            // NOUVEAU : Option magique qui déclenche la vue double
+            filterHtml += '<option value="double_view_setup" style="font-weight:bold; color:#2b6cb0;">👥 Créer Vue Double...</option>';
+            
             const pf = document.getElementById('practitionerFilter');
-            if (pf) pf.innerHTML = filterHtml; 
+            const currentVal = pf ? pf.value : '';
+            
+            // Maintient en mémoire la vue double si elle est déjà sélectionnée, pour ne pas la perdre à chaque rafraîchissement
+            if (currentVal && currentVal.startsWith('double_') && currentVal !== 'double_view_setup') {
+                const parts = currentVal.split('_');
+                const n1 = kinesConfig[parts[1]] ? kinesConfig[parts[1]].name : 'Kiné 1';
+                const n2 = kinesConfig[parts[2]] ? kinesConfig[parts[2]].name : 'Kiné 2';
+                filterHtml += `<option value="${currentVal}">👥 ${n1} & ${n2}</option>`;
+            }
+
+            if (pf) {
+                pf.innerHTML = filterHtml; 
+                if (currentVal) pf.value = currentVal;
+            }
             const ak = document.getElementById('adminKineSelect');
             if (ak) ak.innerHTML = adminHtml;
             const modalKineSelect = document.getElementById('newApptKine');
             if (modalKineSelect) modalKineSelect.innerHTML = activeTitularsHtml;
+        };
+
+        // --- GESTION DE LA VUE DOUBLE ---
+        window.openDoubleViewModal = function() {
+            const select1 = document.getElementById('doubleKine1');
+            const select2 = document.getElementById('doubleKine2');
+            select1.innerHTML = ''; select2.innerHTML = '';
+            
+            const activeTitulars = Object.keys(kinesConfig).filter(k => kinesConfig[k].isActive !== false && !kinesConfig[k].isSubstitute);
+            
+            activeTitulars.forEach(key => {
+                const name = kinesConfig[key].name;
+                select1.innerHTML += `<option value="${key}">${name}</option>`;
+                select2.innerHTML += `<option value="${key}">${name}</option>`;
+            });
+            
+            // Sélectionne un kiné différent par défaut pour le 2ème menu si possible
+            if (activeTitulars.length > 1) select2.value = activeTitulars[1]; 
+            
+            document.getElementById('doubleViewModal').style.display = 'flex';
+        };
+
+        window.applyDoubleView = function() {
+            const k1 = document.getElementById('doubleKine1').value;
+            const k2 = document.getElementById('doubleKine2').value;
+            
+            if (k1 === k2) return alert("Veuillez sélectionner deux praticiens différents.");
+            
+            const pFilter = document.getElementById('practitionerFilter');
+            const val = `double_${k1}_${k2}`;
+            
+            // Injecte l'option temporaire dans le menu et l'active
+            if (!Array.from(pFilter.options).some(opt => opt.value === val)) {
+                const n1 = kinesConfig[k1].name, n2 = kinesConfig[k2].name;
+                pFilter.innerHTML += `<option value="${val}">👥 ${n1} & ${n2}</option>`;
+            }
+            
+            pFilter.value = val;
+            document.getElementById('doubleViewModal').style.display = 'none';
+            renderCalendar();
         };
 
         // --- GESTION ADMIN GLOBALE ---
@@ -1973,6 +2049,14 @@
         window.renderCalendar = function() {
             if (typeof renderTimeAxis === 'function') renderTimeAxis(); 
             const practitionerFilter = document.getElementById('practitionerFilter');
+            
+            // Intercepte le choix "Créer vue double" dans le menu déroulant
+            if (practitionerFilter && practitionerFilter.value === 'double_view_setup') {
+                window.openDoubleViewModal();
+                practitionerFilter.value = 'all'; // On remet temporairement sur Globale pendant le paramétrage
+                return;
+            }
+
             const dateSelect = document.getElementById('dateSelect');
             const calendarGrid = document.getElementById('mainCalendarGrid');
             const daysWrapper = document.getElementById('daysWrapper');
@@ -1980,29 +2064,44 @@
             const selectedKine = practitionerFilter ? practitionerFilter.value : 'all';
             const isMobile = window.innerWidth <= 768;
             
+            // Unifie la logique : La vue Globale et la Vue Double partagent le même fonctionnement visuel
+            const isGlobalOrDouble = selectedKine === 'all' || selectedKine.startsWith('double_');
+            
             let currentDayIndex = new Date(dateSelect.value).getDay(); 
             currentDayIndex = (currentDayIndex === 0 || currentDayIndex === 6) ? 0 : currentDayIndex - 1;
             const weekInfo = getDatesOfWeek(dateSelect.value);
 
-            if (!isMobile && selectedKine === 'all') calendarGrid.classList.add('global-view');
+            if (!isMobile && isGlobalOrDouble) calendarGrid.classList.add('global-view');
             else calendarGrid.classList.remove('global-view');
 
             daysWrapper.innerHTML = '';
             const startDay = isMobile ? currentDayIndex : 0, endDay = isMobile ? currentDayIndex + 1 : 5;
             
-            // LE FILTRE EST ICI : On exclut les profils désactivés et les remplaçants
-            const allKinesKeys = Object.keys(kinesConfig).filter(k => kinesConfig[k].isActive !== false && !kinesConfig[k].isSubstitute);
+            // DÉTERMINATION PRÉCISE DES KINÉS À AFFICHER SELON LE MODE
+            const allActiveTitulars = Object.keys(kinesConfig).filter(k => kinesConfig[k].isActive !== false && !kinesConfig[k].isSubstitute);
+            let viewKinesKeys = [];
+            
+            if (selectedKine === 'all') {
+                viewKinesKeys = allActiveTitulars;
+            } else if (selectedKine.startsWith('double_')) {
+                const parts = selectedKine.split('_');
+                viewKinesKeys = [parts[1], parts[2]].filter(k => kinesConfig[k]); // Filtre de sécurité
+            } else {
+                viewKinesKeys = [selectedKine];
+            }
 
+            // DESSIN DES COLONNES
             for (let i = startDay; i < endDay; i++) {
                 const dayCol = document.createElement('div'); dayCol.className = 'day-column';
-                if (selectedKine !== 'all') dayCol.classList.add('single-practitioner');
+                if (!isGlobalOrDouble) dayCol.classList.add('single-practitioner');
 
                 const dayNameStr = `${DAYS_FR[i]} ${weekInfo.dates[i]}`;
                 let headerHtml = `<div class="day-header">
                     <span class="day-name">${dayNameStr}</span>`;
                 
-                if(selectedKine !== 'all') {
-                    const activeK = selectedKine === 'all' ? allKinesKeys[0] : selectedKine;
+                // HEADER INDIVIDUEL (Mobile ou Vue unique)
+                if(!isGlobalOrDouble) {
+                    const activeK = viewKinesKeys[0];
                     if(activeK && kinesConfig[activeK]) {
                         headerHtml += `<button class="btn-day-config" onclick="openDayConfig('${activeK}', ${i}, '${dayNameStr}')" style="position: absolute; top: 4px; right: 4px; padding: 2px 4px; margin: 0; opacity: 0.7;" title="Horaires du jour">⚙️</button>
                         <div style="margin-top: 5px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
@@ -2012,9 +2111,10 @@
                 }
                 headerHtml += `</div>`;
 
-                if (!isMobile && selectedKine === 'all') {
-                    headerHtml += `<div class="sub-header-labels" style="grid-template-columns: repeat(${allKinesKeys.length}, 1fr);">`;
-                    allKinesKeys.forEach(key => {
+                // HEADER GLOBAL OU DOUBLE (Sur PC)
+                if (!isMobile && isGlobalOrDouble) {
+                    headerHtml += `<div class="sub-header-labels" style="grid-template-columns: repeat(${viewKinesKeys.length}, 1fr);">`;
+                    viewKinesKeys.forEach(key => {
                         const kine = kinesConfig[key];
                         headerHtml += `<div style="color: ${kine.color};">
                             <span class="nav-name-link" style="cursor: pointer; font-weight: bold;" onclick="switchToSingleView('${key}')" title="Voir l'agenda de ${kine.name} uniquement">${getKineDisplayName(key, weekInfo.fullDates[i])}</span> 
@@ -2026,14 +2126,15 @@
                 dayCol.innerHTML = headerHtml;
 
                 const subGrid = document.createElement('div'); subGrid.className = 'practitioners-subgrid';
-                subGrid.style.gridTemplateColumns = (selectedKine === 'all' && !isMobile) ? `repeat(${allKinesKeys.length}, 1fr)` : '1fr';
+                subGrid.style.gridTemplateColumns = (!isMobile && isGlobalOrDouble) ? `repeat(${viewKinesKeys.length}, 1fr)` : '1fr';
 
-                if (selectedKine === 'all' && !isMobile) {
-                    allKinesKeys.forEach(kId => {
+                // INJECTION DES RDVS DANS LES COLONNES
+                if (!isMobile && isGlobalOrDouble) {
+                    viewKinesKeys.forEach(kId => {
                         if(kinesConfig[kId]) subGrid.appendChild(createKineColumn(kId, i, weekInfo.fullDates[i]));
                     });
                 } else {
-                    const activeKine = selectedKine === 'all' ? allKinesKeys[0] : selectedKine;
+                    const activeKine = viewKinesKeys[0];
                     if(activeKine && kinesConfig[activeKine]) subGrid.appendChild(createKineColumn(activeKine, i, weekInfo.fullDates[i]));
                 }
 
