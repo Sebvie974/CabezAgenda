@@ -1391,23 +1391,28 @@
                 }
             }
             
-            // NOUVEAU : Option magique qui déclenche la vue double
+            // NOUVEAU : Recharger les vues doubles sauvegardées dans la mémoire de l'appareil
+            let savedDoubleViews = JSON.parse(localStorage.getItem('savedDoubleViews') || '[]');
+            savedDoubleViews.forEach(val => {
+                const parts = val.split('_');
+                if (parts.length === 3 && kinesConfig[parts[1]] && kinesConfig[parts[2]]) {
+                    const n1 = kinesConfig[parts[1]].name;
+                    const n2 = kinesConfig[parts[2]].name;
+                    filterHtml += `<option value="${val}">👥 ${n1} & ${n2}</option>`;
+                }
+            });
+
             filterHtml += '<option value="double_view_setup" style="font-weight:bold; color:#2b6cb0;">👥 Créer Vue Double...</option>';
             
             const pf = document.getElementById('practitionerFilter');
             const currentVal = pf ? pf.value : '';
-            
-            // Maintient en mémoire la vue double si elle est déjà sélectionnée, pour ne pas la perdre à chaque rafraîchissement
-            if (currentVal && currentVal.startsWith('double_') && currentVal !== 'double_view_setup') {
-                const parts = currentVal.split('_');
-                const n1 = kinesConfig[parts[1]] ? kinesConfig[parts[1]].name : 'Kiné 1';
-                const n2 = kinesConfig[parts[2]] ? kinesConfig[parts[2]].name : 'Kiné 2';
-                filterHtml += `<option value="${currentVal}">👥 ${n1} & ${n2}</option>`;
-            }
 
             if (pf) {
                 pf.innerHTML = filterHtml; 
-                if (currentVal) pf.value = currentVal;
+                // Restaure la sélection active si elle existe encore
+                if (currentVal && Array.from(pf.options).some(opt => opt.value === currentVal)) {
+                    pf.value = currentVal;
+                }
             }
             const ak = document.getElementById('adminKineSelect');
             if (ak) ak.innerHTML = adminHtml;
@@ -1415,11 +1420,10 @@
             if (modalKineSelect) modalKineSelect.innerHTML = activeTitularsHtml;
         };
 
-        // --- GESTION DE LA VUE DOUBLE ---
+        // --- GESTION DE LA VUE DOUBLE (MÉMORISÉE) ---
         window.openDoubleViewModal = function() {
             let modal = document.getElementById('doubleViewModal');
             
-            // Si la fenêtre n'existe pas dans le HTML, le JS la construit tout seul !
             if (!modal) {
                 modal = document.createElement('div');
                 modal.className = 'modal-overlay';
@@ -1440,8 +1444,9 @@
                             </div>
                             <button class="btn-save" onclick="applyDoubleView()" style="width: 100%; margin-top: 10px; background-color: #3182ce;">Afficher le duo</button>
                         </div>
-                        <div class="modal-actions" style="margin-top: 15px;">
-                            <button class="btn-cancel" onclick="document.getElementById('doubleViewModal').style.display='none'" style="width: 100%;">Annuler</button>
+                        <div class="modal-actions" style="margin-top: 15px; justify-content: space-between;">
+                            <button class="btn-cancel" onclick="clearSavedDoubleViews()" style="border-color: #e53e3e; color: #e53e3e; font-size: 0.8rem; padding: 4px 8px;">Vider les vues doubles</button>
+                            <button class="btn-cancel" onclick="document.getElementById('doubleViewModal').style.display='none'">Annuler</button>
                         </div>
                     </div>`;
                 document.body.appendChild(modal);
@@ -1473,13 +1478,31 @@
             const pFilter = document.getElementById('practitionerFilter');
             const val = `double_${k1}_${k2}`;
             
+            // Sauvegarde de la nouvelle vue
+            let savedDoubleViews = JSON.parse(localStorage.getItem('savedDoubleViews') || '[]');
+            if (!savedDoubleViews.includes(val)) {
+                savedDoubleViews.push(val);
+                localStorage.setItem('savedDoubleViews', JSON.stringify(savedDoubleViews));
+            }
+
             if (!Array.from(pFilter.options).some(opt => opt.value === val)) {
                 const n1 = kinesConfig[k1].name, n2 = kinesConfig[k2].name;
-                pFilter.innerHTML += `<option value="${val}">👥 ${n1} & ${n2}</option>`;
+                const newOption = new Option(`👥 ${n1} & ${n2}`, val);
+                pFilter.insertBefore(newOption, pFilter.lastElementChild);
             }
             
             pFilter.value = val;
+            localStorage.setItem('lastView', val); // Mémoriser la sélection active
             document.getElementById('doubleViewModal').style.display = 'none';
+            renderCalendar();
+        };
+
+        window.clearSavedDoubleViews = function() {
+            localStorage.removeItem('savedDoubleViews');
+            document.getElementById('doubleViewModal').style.display = 'none';
+            const pf = document.getElementById('practitionerFilter');
+            if(pf && pf.value.startsWith('double_')) pf.value = 'all';
+            updateKineSelects();
             renderCalendar();
         };
 
@@ -2668,18 +2691,43 @@
             }
             
             await loadDataFromSupabase(); 
-            lastSyncDataHash = JSON.stringify(appointments) + JSON.stringify(cabinetNotes) + JSON.stringify(kinesConfig);
-            startAutoSync(); // Démarre la vérification toutes les 10 secondes
+            
+            if (typeof startAutoSync === 'function') {
+                lastSyncDataHash = JSON.stringify(appointments) + JSON.stringify(cabinetNotes) + JSON.stringify(kinesConfig);
+                startAutoSync(); 
+            }
+            
+            if (typeof setupRealtimeSubscriptions === 'function') {
+                setupRealtimeSubscriptions(); 
+            }
             
             updateKineSelects(); 
             updatePatientSuggestions();
             
+            // LECTURE DE LA MÉMOIRE POUR RESTAURER LA DERNIÈRE VUE
             const pFilter = document.getElementById('practitionerFilter');
-            if (window.innerWidth <= 768 && pFilter && pFilter.value === 'all') pFilter.value = Object.keys(kinesConfig)[0];
+            if (pFilter) {
+                const savedView = localStorage.getItem('lastView');
+                const myId = currentUserProfile ? currentUserProfile.kine_id : null;
+                const hasMyOption = Array.from(pFilter.options).some(opt => opt.value === myId);
+                const hasSavedOption = savedView && Array.from(pFilter.options).some(opt => opt.value === savedView);
+                
+                if (hasSavedOption) {
+                    pFilter.value = savedView; // Affiche la dernière vue consultée (même une vue double)
+                } else if (hasMyOption) {
+                    pFilter.value = myId; // Sinon affiche SON planning par défaut
+                } else if (window.innerWidth <= 768 && pFilter.value === 'all') {
+                    pFilter.value = pFilter.options.length > 1 ? pFilter.options[1].value : Object.keys(kinesConfig)[0];
+                }
+            }
             
             renderCalendar();
 
-            pFilter?.addEventListener('change', renderCalendar);
+            // Mémorise la vue à chaque fois qu'on la change
+            pFilter?.addEventListener('change', (e) => {
+                localStorage.setItem('lastView', e.target.value);
+                renderCalendar();
+            });
             
             dateInput?.addEventListener('change', (e) => {
                 if (window.innerWidth > 768) {
@@ -2749,13 +2797,27 @@
                 if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
             });
 
+            document.getElementById('todayBtn')?.addEventListener('click', () => {
+                const dateInput = document.getElementById('dateSelect');
+                if (dateInput) {
+                    const now = new Date();
+                    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                    
+                    if (window.innerWidth > 768 && typeof snapToMonday === 'function') {
+                        dateInput.value = snapToMonday(todayStr);
+                    } else {
+                        dateInput.value = todayStr;
+                    }
+                    renderCalendar(); 
+                }
+            });
+
             window.addEventListener('resize', () => {
                 if (window.innerWidth <= 768 && pFilter && pFilter.value === 'all') pFilter.value = Object.keys(kinesConfig)[0];
                 if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
                 renderCalendar();
             });
 
-            // --- RECONNEXION DES BOUTONS DE LA MODALE RDV ---
             document.getElementById('cancelApptBtn')?.addEventListener('click', () => {
                 document.getElementById('addApptModal').style.display = 'none';
             });
