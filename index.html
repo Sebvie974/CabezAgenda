@@ -635,6 +635,7 @@
                     <input type="date" id="dateSelect">
                     <button class="btn-cancel" id="nextDateBtn" style="padding: 0 10px;">&gt;</button>
                     <button class="btn-save" id="todayBtn" onclick="const d = document.getElementById('dateSelect'); if(d) { const now = new Date(); d.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0'); d.dispatchEvent(new Event('change')); }" style="padding: 0 10px; background-color: #4a5568;">Aujourd'hui</button>
+                    <button class="btn-cancel" onclick="window.toggleZoom()" style="padding: 0 10px; border-color: #3182ce; color: #3182ce;" title="Zoom">🔍 Zoom</button>
                 </div>
             </div>
             
@@ -788,8 +789,8 @@
         const supabaseKey = 'sb_publishable_0a1_NQj3D8vpRart3Qb7Fg_-WoBkBDa'; // À RENSEIGNER
         const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-        const START_HOUR = 7, END_HOUR = 20, PIXELS_PER_MINUTE = 2;
-        const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE; 
+        const START_HOUR = 7, END_HOUR = 20;
+        let PIXELS_PER_MINUTE = 2; 
         const DAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
 
         // On initialise les variables à vide
@@ -1187,14 +1188,12 @@
             const dateInput = document.getElementById('dateSelect');
             if(dateInput && !dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
             
-            // Si on est sur PC (vue semaine), on force l'input à afficher le Lundi
             if (dateInput && window.innerWidth > 768) {
                 dateInput.value = snapToMonday(dateInput.value);
             }
             
             await loadDataFromSupabase(); 
             
-            // Démarrage de la synchronisation silencieuse anti-coupure (Polling)
             if (typeof startAutoSync === 'function') {
                 lastSyncDataHash = JSON.stringify(appointments) + JSON.stringify(cabinetNotes) + JSON.stringify(kinesConfig);
                 startAutoSync(); 
@@ -1207,8 +1206,18 @@
             updateKineSelects(); 
             updatePatientSuggestions();
             
+            // NOUVEAU : Ciblage du kiné connecté par défaut
             const pFilter = document.getElementById('practitionerFilter');
-            if (window.innerWidth <= 768 && pFilter && pFilter.value === 'all') pFilter.value = Object.keys(kinesConfig)[0];
+            if (pFilter) {
+                const myId = currentUserProfile ? currentUserProfile.kine_id : null;
+                const hasMyOption = Array.from(pFilter.options).some(opt => opt.value === myId);
+                
+                if (hasMyOption) {
+                    pFilter.value = myId; // Affiche SON planning prioritairement
+                } else if (window.innerWidth <= 768 && pFilter.value === 'all') {
+                    pFilter.value = pFilter.options.length > 1 ? pFilter.options[1].value : Object.keys(kinesConfig)[0];
+                }
+            }
             
             renderCalendar();
 
@@ -1282,12 +1291,10 @@
                 if (window.innerWidth > 768 && dateInput) dateInput.value = snapToMonday(dateInput.value);
             });
 
-            // Bouton "Aujourd'hui" corrigé (Heure locale + Forçage de l'affichage)
             document.getElementById('todayBtn')?.addEventListener('click', () => {
                 const dateInput = document.getElementById('dateSelect');
                 if (dateInput) {
                     const now = new Date();
-                    // Génère la date au format local AAAA-MM-JJ
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                     
                     if (window.innerWidth > 768 && typeof snapToMonday === 'function') {
@@ -1295,7 +1302,7 @@
                     } else {
                         dateInput.value = todayStr;
                     }
-                    renderCalendar(); // Force le dessin immédiat de la grille
+                    renderCalendar(); 
                 }
             });
 
@@ -1305,7 +1312,6 @@
                 renderCalendar();
             });
 
-            // --- RECONNEXION DES BOUTONS DE LA MODALE RDV ---
             document.getElementById('cancelApptBtn')?.addEventListener('click', () => {
                 document.getElementById('addApptModal').style.display = 'none';
             });
@@ -2006,7 +2012,9 @@
 
         function createKineColumn(kineId, dayIndex, exactDate) {
             const config = kinesConfig[kineId], col = document.createElement('div');
-            col.className = 'practitioner-column'; col.style.height = `${TOTAL_HEIGHT}px`;
+            col.className = 'practitioner-column'; 
+            // NOUVEAU : Hauteur calculée dynamiquement selon le niveau de zoom
+            col.style.height = `${(END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE}px`;
 
             const gapPx = config.slotDuration * PIXELS_PER_MINUTE; 
             col.style.backgroundSize = `100% ${gapPx}px`;
@@ -2027,7 +2035,6 @@
                 const snappedMins = Math.floor(totalMins / config.slotDuration) * config.slotDuration;
                 const newTimeStr = `${(Math.floor(snappedMins / 60) + START_HOUR).toString().padStart(2,'0')}:${(snappedMins % 60).toString().padStart(2, '0')}`;
 
-                // CORRECTION : utilisation de "appointments" au lieu de "mockAppointments"
                 const index = appointments.findIndex(a => a.id === apptId);
                 if (index !== -1) {
                     appointments[index].kineId = kineId;
@@ -2056,7 +2063,6 @@
             drawBlock(daySchedule.pauseStart, daySchedule.pauseEnd);
             if (daySchedule.end < END_HOUR) drawBlock(daySchedule.end, END_HOUR);
 
-            // CORRECTION : utilisation de "appointments"
             const dailyAppts = appointments.filter(a => a.kineId === kineId && (a.exactDate === exactDate || (!a.exactDate && a.dayIndex === dayIndex)));
             const timeGroups = {};
             dailyAppts.forEach(appt => {
@@ -2090,7 +2096,6 @@
                             e.stopPropagation(); 
                             if(confirm(`Débloquer ce créneau de ${appt.timeStr} ?`)) {
                                 await supabaseClient.from('appointments').delete().eq('id', appt.id);
-                                // CORRECTION : utilisation de "appointments"
                                 appointments = appointments.filter(a => a.id !== appt.id);
                                 saveData(); updatePatientSuggestions(); renderCalendar();
                             }
@@ -2160,7 +2165,7 @@
                                 textDeco = 'line-through';
                                 if (!isPast) boxOpacity = '0.5';
                             } else if (appt.status === 'cancelled_24h') {
-                                textDeco = 'line-through'; // <-- Le nom sera désormais barré
+                                textDeco = 'line-through'; 
                                 prefix += `<span style="background-color: #718096; color: white; padding: 0 4px; border-radius: 3px; font-size: 0.6rem; font-weight: bold; margin-right: 4px;" title="Annulé 24h avant">24</span>`;
                                 if (!isPast) boxOpacity = '0.5';
                             }
@@ -2184,13 +2189,11 @@
                             e.stopPropagation(); 
                             if (window.isSecretariatMode) {
                                 appt.vegaPointed = !appt.vegaPointed;
-                                // CORRECTION : utilisation de "appointments"
                                 const idx = appointments.findIndex(a => a.id === appt.id);
                                 if (idx !== -1) appointments[idx].vegaPointed = appt.vegaPointed;
                                 saveData();
                                 renderCalendar();
                             } else {
-                                // CORRECTION MAJEURE : On n'envoie que l'ID (appt.id) et non pas l'objet (appt) !
                                 openEditModal(appt.id); 
                             }
                         });
@@ -2199,7 +2202,6 @@
                 });
             });
 
-            // Dessin des étiquettes horaires sur les créneaux vides
             for (let m = START_HOUR * 60; m < END_HOUR * 60; m += config.slotDuration) {
                 const isOccupied = dailyAppts.some(a => {
                     if (!a.timeStr) return false;
@@ -2930,12 +2932,14 @@
 
         window.createSubstituteProfile = async function() {
             const nameInput = document.getElementById('newSubName');
-            const name = nameInput ? nameInput.value.trim() : '';
+            const fullName = nameInput ? nameInput.value.trim() : '';
             
-            if (!name) return alert("Veuillez saisir un prénom/nom.");
+            if (!fullName) return alert("Veuillez saisir un prénom/nom.");
 
-            // On revient à l'email basé uniquement sur le prénom (ex: julien@cabinet.fr)
-            const cleanId = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
+            // EXTRACTION DU PRÉNOM (Prend uniquement le premier mot saisi)
+            const firstName = fullName.split(/\s+/)[0];
+
+            const cleanId = firstName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
             const email = `${cleanId}@cabinet.fr`;
             const password = `Kine${Math.floor(1000 + Math.random() * 9000)}!`;
             const newId = 'sub_' + cleanId + '_' + Date.now(); 
@@ -2946,21 +2950,28 @@
 
             const { data, error } = await tempClient.auth.signUp({ email: email, password: password });
             
-            // Si le compte existe déjà, Supabase renvoie l'erreur et on prévient l'utilisateur
             if (error) return alert("Erreur : Ce compte existe déjà ou l'adresse est invalide (" + error.message + ")");
 
             await supabaseClient.from('profiles').update({ role: 'remplacant', kine_id: newId }).eq('id', data.user.id);
             
+            // On enregistre bien le NOM COMPLET dans l'agenda
             kinesConfig[newId] = {
-                name: name, color: '#718096', slotDuration: 30, isActive: true, isSubstitute: true, replacementSessions: []
+                name: fullName, color: '#718096', slotDuration: 30, isActive: true, isSubstitute: true, replacementSessions: []
             };
             
             if (typeof saveData === 'function') {
                 await saveData();
-                alert(`✅ PROFIL ET ACCÈS CRÉÉS AVEC SUCCÈS !\n\nRemplaçant : ${name}\nIdentifiant de connexion : ${cleanId} (ou ${email})\nMot de passe : ${password}\n\nTransmettez ces accès pour qu'il/elle puisse se connecter.`);
+                alert(`✅ PROFIL ET ACCÈS CRÉÉS AVEC SUCCÈS !\n\nRemplaçant : ${fullName}\nIdentifiant de connexion : ${cleanId}\nMot de passe : ${password}\n\nTransmettez ces accès pour qu'il/elle puisse se connecter.`);
                 if (nameInput) nameInput.value = '';
                 window.openSubstitutesModal(); 
             }
+        };
+
+        //Fonction Zoom
+        window.toggleZoom = function() {
+            // Bascule entre 3 niveaux d'étirement des lignes (Standard, Moyen, Grand)
+            PIXELS_PER_MINUTE = PIXELS_PER_MINUTE === 2 ? 3 : (PIXELS_PER_MINUTE === 3 ? 4 : 2);
+            renderCalendar();
         };
     </script>
 </body>
