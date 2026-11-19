@@ -704,9 +704,11 @@
                 <button class="btn-save" onclick="window.openSubstitutesModal()" style="background-color: #e53e3e; height: 38px; margin: 0; padding: 0 12px;" title="Gérer les remplacements">🤝 Remplaçants</button>
                 <button class="btn-save" id="openAdminBtn" style="background-color: #4a5568; height: 38px; margin: 0; padding: 0 12px;">⚙️ Config</button>
                 <button class="btn-save" onclick="openNotesModal()" style="background-color: #d69e2e; height: 38px; margin: 0; padding: 0 15px; position: relative;" title="Notes du Cabinet">
-    📝 Notes
-    <span id="notesBadge" style="display: none; position: absolute; top: -6px; right: -6px; background-color: #e53e3e; color: white; border-radius: 50%; font-size: 0.7rem; font-weight: bold; border: 2px solid #2d3748; align-items: center; justify-content: center; min-width: 20px; height: 20px; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">0</span>
-</button>
+                    📝 Notes
+                
+                    <span id="notesBadge" style="display: none; position: absolute; top: -6px; right: -6px; background-color: #e53e3e; color: white; border-radius: 50%; font-size: 0.7rem; font-weight: bold; border: 2px solid #2d3748; align-items: center; justify-content: center; min-width: 20px; height: 20px; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">0</span>
+                </button>
+                <button class="btn-save" onclick="openPatientsDirectoryModal()" style="background-color: #319795; height: 38px; margin: 0; padding: 0 12px;" title="Répertoire des patients">👥 Patients</button>
                 <button class="btn-cancel" onclick="forceAppUpdate()" style="border-color: #ecc94b; color: #d69e2e; height: 38px; margin: 0; padding: 0 8px;" title="Forcer la mise à jour">🔄</button>
                 <button class="btn-save" onclick="document.getElementById('profileModal').style.display='flex'" style="background-color: #3182ce; height: 38px; margin: 0; padding: 0 8px;" title="Mon Profil">🔑</button>
                 <button class="btn-cancel" onclick="logoutUser()" style="border-color: #e53e3e; color: #e53e3e; height: 38px; margin: 0; padding: 0 8px;" title="Se déconnecter">🚪</button>
@@ -855,6 +857,54 @@
             </div>
             <div class="modal-actions" style="margin-top: 15px;">
                 <button class="btn-cancel" onclick="document.getElementById('doubleViewModal').style.display='none'" style="width: 100%;">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE : BASE DE PATIENTS -->
+    <div class="modal-overlay" id="patientsDirectoryModal" style="display: none;">
+        <div class="modal-content" style="width: 600px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: #319795; margin: 0;">👥 Base de Patients (<span id="patientsTotalCount">0</span>)</h3>
+                <button class="btn-cancel" onclick="document.getElementById('patientsDirectoryModal').style.display='none'" style="padding: 0 10px; font-weight: bold; border-color: #e53e3e; color: #e53e3e;">X</button>
+            </div>
+
+            <!-- Formulaire d'ajout / modification rapide -->
+            <details id="patientFormDetails" style="background: rgba(0,0,0,0.15); padding: 10px 12px; border-radius: 8px; border: 1px solid #4a5568; margin-bottom: 12px;">
+                <summary id="patientFormSummary" style="color: #81e6d9; font-weight: bold; cursor: pointer; outline: none; user-select: none;">
+                    ➕ Ajouter / Modifier une fiche patient
+                </summary>
+                <div style="padding-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                    <input type="hidden" id="dirEditPatientId">
+                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;">
+                        <div class="control-group" style="margin: 0;">
+                            <label>Nom & Prénom</label>
+                            <input type="text" id="dirPatientName" placeholder="Ex: Jean Dupont">
+                        </div>
+                        <div class="control-group" style="margin: 0;">
+                            <label>Téléphone(s) (séparés par virgule)</label>
+                            <input type="text" id="dirPatientPhones" placeholder="Ex: 0692 12 34 56, 0262...">
+                        </div>
+                    </div>
+                    <div class="control-group" style="margin: 0;">
+                        <label>Note permanente</label>
+                        <input type="text" id="dirPatientNote" placeholder="Ex: Kiné respi, mutuelle, code portail...">
+                    </div>
+                    <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+                        <button type="button" class="btn-cancel" id="dirCancelEditBtn" onclick="resetDirectoryPatientForm()" style="display: none; padding: 5px 10px;">Annuler</button>
+                        <button type="button" class="btn-save" onclick="savePatientFromDirectory()" style="background-color: #319795; padding: 6px 15px; margin: 0;">Enregistrer la fiche</button>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Barre de recherche instantanée -->
+            <div class="control-group" style="margin-bottom: 12px;">
+                <input type="text" id="dirSearchInput" oninput="renderPatientsDirectory()" placeholder="🔍 Filtrer par nom ou numéro de téléphone..." autocomplete="off">
+            </div>
+
+            <!-- Liste des patients -->
+            <div id="patientsDirectoryList" style="overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                <!-- Généré dynamiquement -->
             </div>
         </div>
     </div>
@@ -2083,6 +2133,7 @@
             }
 
             updatePatientSuggestions(); 
+            if (typeof upsertPatientRecord === 'function') upsertPatientRecord(patientNameStr, phonesArray, currentNote);
             const mod = document.getElementById('addApptModal');
             if(mod) mod.style.display = 'none'; 
             renderCalendar();
@@ -3629,6 +3680,282 @@
             const name = patientName || document.getElementById('newPatientName')?.value?.trim();
             if (name) window.openPatientHistoryGlobal(name);
         };
+
+        // --- BASE DE PATIENTS (SUPABASE + AUTO-REMPLISSAGE) ---
+        let patientsDirectory = [];
+
+        window.loadPatientsFromSupabase = async function() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('patients')
+                    .select('*')
+                    .order('name', { ascending: true });
+
+                if (!error && data) {
+                    patientsDirectory = data;
+                    if (typeof updatePatientSuggestions === 'function') updatePatientSuggestions();
+                }
+            } catch (e) {
+                console.error("Erreur chargement patients:", e);
+            }
+        };
+
+        // Enregistre ou met à jour automatiquement un patient dans la base
+        window.upsertPatientRecord = async function(rawName, phonesArray, noteStr) {
+            if (!rawName) return;
+            const cleanName = rawName.trim();
+            if (!cleanName || cleanName === 'Indisponible' || cleanName === 'Patient') return;
+
+            const existing = patientsDirectory.find(p => p.name.trim().toLowerCase() === cleanName.toLowerCase());
+
+            if (existing) {
+                const updatedPhones = (phonesArray && phonesArray.length > 0) ? phonesArray : (existing.phones || []);
+                const updatedNote = (noteStr !== undefined && noteStr !== null) ? noteStr : (existing.note || '');
+
+                const { error } = await supabaseClient
+                    .from('patients')
+                    .update({ name: cleanName, phones: updatedPhones, note: updatedNote })
+                    .eq('id', existing.id);
+
+                if (!error) {
+                    existing.name = cleanName;
+                    existing.phones = updatedPhones;
+                    existing.note = updatedNote;
+                    updatePatientSuggestions();
+                }
+            } else {
+                const { data, error } = await supabaseClient
+                    .from('patients')
+                    .insert([{ name: cleanName, phones: phonesArray || [], note: noteStr || '' }])
+                    .select();
+
+                if (!error && data && data.length > 0) {
+                    patientsDirectory.push(data[0]);
+                    patientsDirectory.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+                    updatePatientSuggestions();
+                }
+            }
+        };
+
+        // Alimente les listes déroulantes (Nouveau RDV + Recherche globale) depuis la base
+        window.updatePatientSuggestions = function() {
+            const namesMap = new Map();
+
+            patientsDirectory.forEach(p => {
+                if (p.name) namesMap.set(p.name.trim().toLowerCase(), p.name.trim());
+            });
+
+            if (typeof appointments !== 'undefined' && Array.isArray(appointments)) {
+                appointments.forEach(a => {
+                    if (a.patient && a.patient !== 'Indisponible' && a.patient !== 'Patient') {
+                        const key = a.patient.trim().toLowerCase();
+                        if (!namesMap.has(key)) namesMap.set(key, a.patient.trim());
+                    }
+                });
+            }
+
+            const sortedNames = Array.from(namesMap.values()).sort((a, b) => a.localeCompare(b, 'fr'));
+            const optionsHtml = sortedNames.map(name => `<option value="${name.replace(/"/g, '&quot;')}">`).join('');
+
+            const dl1 = document.getElementById('patientsList');
+            const dl2 = document.getElementById('globalPatientsList');
+            if (dl1) dl1.innerHTML = optionsHtml;
+            if (dl2) dl2.innerHTML = optionsHtml;
+        };
+
+        // Helper pour afficher les lignes téléphone dans la modale de RDV
+        window.addApptPhoneRow = function(num = '', label = '', isFirst = false) {
+            const container = document.getElementById('phoneInputsContainer');
+            if (!container) return;
+            const row = document.createElement('div');
+            row.className = 'phone-line';
+            row.style.cssText = 'display: flex; gap: 5px; align-items: center;';
+            row.innerHTML = `
+                <input type="text" class="appt-phone-input" value="${num}" placeholder="06..." style="flex: 1.2; min-width: 0;">
+                <input type="text" class="appt-phone-label" value="${label}" placeholder="Ex: Portable, Maman..." style="flex: 1; min-width: 0;">
+                ${isFirst 
+                    ? `<button type="button" class="btn-save" onclick="addApptPhoneRow('', '', false)" style="padding: 2px 8px; margin: 0; background-color: #3182ce;" title="Ajouter un numéro">+</button>`
+                    : `<button type="button" class="btn-cancel" onclick="this.parentElement.remove()" style="padding: 2px 8px; margin: 0; border-color: #e53e3e; color: #e53e3e;">X</button>`
+                }
+            `;
+            container.appendChild(row);
+        };
+
+        // Auto-remplissage lors de la saisie du nom dans la modale de RDV
+        window.fillPatientData = function(patientName) {
+            if (!patientName) return;
+            const search = patientName.trim().toLowerCase();
+            if (!search) return;
+
+            let found = patientsDirectory.find(p => p.name.trim().toLowerCase() === search);
+
+            // Repli sur l'historique des RDV si pas encore dans la base
+            if (!found && typeof appointments !== 'undefined') {
+                const pastAppt = [...appointments].reverse().find(a => a.patient && a.patient.trim().toLowerCase() === search);
+                if (pastAppt) found = { phones: pastAppt.phones || [], note: pastAppt.note || '' };
+            }
+
+            if (found) {
+                const container = document.getElementById('phoneInputsContainer');
+                if (container) {
+                    container.innerHTML = '';
+                    if (found.phones && found.phones.length > 0) {
+                        found.phones.forEach((pStr, idx) => {
+                            const match = pStr.match(/^(.*?)\s*\[(.*?)\]$/);
+                            if (match) addApptPhoneRow(match[1].trim(), match[2].trim(), idx === 0);
+                            else addApptPhoneRow(pStr.trim(), '', idx === 0);
+                        });
+                    } else {
+                        addApptPhoneRow('', '', true);
+                    }
+                }
+                const noteEl = document.getElementById('newApptNotes');
+                if (noteEl && found.note) noteEl.value = found.note;
+            }
+        };
+
+        // --- GESTION DE LA MODALE RÉPERTOIRE PATIENTS ---
+        window.openPatientsDirectoryModal = async function() {
+            const modal = document.getElementById('patientsDirectoryModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            await loadPatientsFromSupabase();
+            renderPatientsDirectory();
+        };
+
+        window.renderPatientsDirectory = function() {
+            const listEl = document.getElementById('patientsDirectoryList');
+            const countEl = document.getElementById('patientsTotalCount');
+            const searchVal = (document.getElementById('dirSearchInput')?.value || '').trim().toLowerCase();
+            if (!listEl) return;
+
+            const filtered = patientsDirectory.filter(p => {
+                const matchName = p.name.toLowerCase().includes(searchVal);
+                const matchPhone = (p.phones || []).some(ph => ph.toLowerCase().includes(searchVal));
+                return matchName || matchPhone;
+            });
+
+            if (countEl) countEl.innerText = filtered.length;
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<p style="text-align: center; color: #a0aec0; padding: 20px; font-style: italic;">Aucun patient trouvé.</p>';
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(p => {
+                const phonesStr = (p.phones && p.phones.length > 0) ? `📞 ${p.phones.join(' / ')}` : '<span style="opacity: 0.5;">Aucun numéro</span>';
+                const noteStr = p.note ? `<div style="font-size: 0.8rem; color: #fbd38d; margin-top: 3px;">📝 ${p.note}</div>` : '';
+                const safeName = p.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+                return `
+                <div style="background: rgba(255,255,255,0.06); border: 1px solid #4a5568; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div style="min-width: 0; flex: 1;">
+                        <div style="font-weight: bold; font-size: 1rem; color: #fff;">${p.name}</div>
+                        <div style="font-size: 0.85rem; color: #cbd5e0; margin-top: 2px;">${phonesStr}</div>
+                        ${noteStr}
+                    </div>
+                    <div style="display: flex; gap: 6px; flex-shrink: 0;">
+                        <button type="button" class="btn-save" onclick="openPatientHistoryFromDir('${safeName}')" style="background-color: #3182ce; padding: 6px 10px; font-size: 0.8rem; margin: 0;" title="Voir ses rendez-vous">📅 RDVs</button>
+                        <button type="button" class="btn-cancel" onclick="editPatientInDirectory(${p.id})" style="padding: 6px 8px; font-size: 0.8rem; margin: 0;" title="Modifier la fiche">✏️</button>
+                        <button type="button" class="btn-cancel" onclick="deletePatientFromDirectory(${p.id}, '${safeName}')" style="padding: 6px 8px; font-size: 0.8rem; margin: 0; border-color: #e53e3e; color: #e53e3e;" title="Supprimer">🗑️</button>
+                    </div>
+                </div>`;
+            }).join('');
+        };
+
+        window.openPatientHistoryFromDir = function(patientName) {
+            const histMod = document.getElementById('patientHistoryModal');
+            if (histMod) histMod.style.zIndex = '1050';
+            if (typeof window.openPatientHistoryGlobal === 'function') {
+                window.openPatientHistoryGlobal(patientName);
+            }
+        };
+
+        window.savePatientFromDirectory = async function() {
+            const editId = document.getElementById('dirEditPatientId').value;
+            const nameVal = document.getElementById('dirPatientName').value.trim();
+            const phonesRaw = document.getElementById('dirPatientPhones').value.trim();
+            const noteVal = document.getElementById('dirPatientNote').value.trim();
+
+            if (!nameVal) return alert("Veuillez saisir le nom du patient.");
+
+            const phonesArray = phonesRaw
+                ? phonesRaw.split(',').map(s => s.trim()).filter(s => s !== '')
+                : [];
+
+            if (editId) {
+                const idNum = parseInt(editId);
+                const oldPatient = patientsDirectory.find(p => p.id === idNum);
+                const oldName = oldPatient ? oldPatient.name : null;
+
+                const { error } = await supabaseClient
+                    .from('patients')
+                    .update({ name: nameVal, phones: phonesArray, note: noteVal })
+                    .eq('id', idNum);
+
+                if (!error) {
+                    // Propage les modifs sur les RDV existants du patient
+                    if (typeof appointments !== 'undefined' && oldName) {
+                        let changed = false;
+                        appointments.forEach(a => {
+                            if (a.patient && a.patient.trim().toLowerCase() === oldName.trim().toLowerCase()) {
+                                a.patient = nameVal;
+                                a.phones = [...phonesArray];
+                                a.note = noteVal;
+                                changed = true;
+                            }
+                        });
+                        if (changed && typeof saveData === 'function') saveData();
+                    }
+                    resetDirectoryPatientForm();
+                    await loadPatientsFromSupabase();
+                    renderPatientsDirectory();
+                    if (typeof renderCalendar === 'function') renderCalendar();
+                }
+            } else {
+                await upsertPatientRecord(nameVal, phonesArray, noteVal);
+                resetDirectoryPatientForm();
+                renderPatientsDirectory();
+            }
+        };
+
+        window.editPatientInDirectory = function(id) {
+            const p = patientsDirectory.find(item => item.id === id);
+            if (!p) return;
+
+            document.getElementById('dirEditPatientId').value = p.id;
+            document.getElementById('dirPatientName').value = p.name;
+            document.getElementById('dirPatientPhones').value = (p.phones || []).join(', ');
+            document.getElementById('dirPatientNote').value = p.note || '';
+
+            document.getElementById('patientFormSummary').innerText = `✏️ Modification : ${p.name}`;
+            document.getElementById('dirCancelEditBtn').style.display = 'inline-block';
+            document.getElementById('patientFormDetails').open = true;
+        };
+
+        window.resetDirectoryPatientForm = function() {
+            document.getElementById('dirEditPatientId').value = '';
+            document.getElementById('dirPatientName').value = '';
+            document.getElementById('dirPatientPhones').value = '';
+            document.getElementById('dirPatientNote').value = '';
+            document.getElementById('patientFormSummary').innerText = '➕ Ajouter / Modifier une fiche patient';
+            document.getElementById('dirCancelEditBtn').style.display = 'none';
+        };
+
+        window.deletePatientFromDirectory = async function(id, name) {
+            if (!confirm(`Supprimer "${name}" de la base de patients ?\n(Ses rendez-vous déjà placés dans l'agenda seront conservés.)`)) return;
+            const { error } = await supabaseClient.from('patients').delete().eq('id', id);
+            if (!error) {
+                patientsDirectory = patientsDirectory.filter(p => p.id !== id);
+                updatePatientSuggestions();
+                renderPatientsDirectory();
+            }
+        };
+
+        // Charge la base de patients dès l'ouverture de l'agenda
+        setTimeout(() => {
+            if (typeof loadPatientsFromSupabase === 'function') loadPatientsFromSupabase();
+        }, 1200);
     </script>
 </body>
 </html>
