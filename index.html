@@ -526,17 +526,21 @@
                 </div>
 
                 <!-- STATUT DU COMPTE -->
-                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
-                    <h4 style="margin-bottom: 8px; color: #2d3748;">Statut du compte</h4>
-                    <div class="control-group" style="display: flex; gap: 15px;">
-                        <label style="cursor: pointer;"><input type="checkbox" id="adminIsActive" style="cursor: pointer;"> Compte Actif</label>
-                        <label style="cursor: pointer;"><input type="checkbox" id="adminIsSub" style="cursor: pointer;"> C'est un Remplaçant</label>
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #4a5568;">
+                    <h4 style="margin: 0 0 10px 0; color: #a0aec0;">Statut du compte</h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="adminIsActive" style="width: 16px; height: 16px; margin: 0; cursor: pointer;"> Compte Actif
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="adminIsSub" style="width: 16px; height: 16px; margin: 0; cursor: pointer;"> C'est un Remplaçant
+                        </label>
                     </div>
                 </div>
                 
                 <!-- TYPES DE RENDEZ-VOUS -->
-                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
-                    <h4 style="margin: 0 0 10px 0; color: #2d3748;">Types de rendez-vous gérés</h4>
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #4a5568;">
+                    <h4 style="margin: 0 0 10px 0; color: #a0aec0;">Types de rendez-vous gérés</h4>
                     <div id="adminTypesContainer" style="display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto; padding-right: 5px; margin-bottom: 10px;">
                         <!-- Les types seront générés ici -->
                     </div>
@@ -544,12 +548,12 @@
                 </div>
 
                 <!-- ACCORDÉON 1 : CRÉATION D'ACCÈS -->
-                <details style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-                    <summary style="color: #3182ce; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
+                <details style="margin-top: 15px; border-top: 1px solid #4a5568; padding-top: 15px;">
+                    <summary style="color: #63b3ed; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
                         👤 Création d'Accès (Nouveau Kiné ou Remplaçant)
                     </summary>
                     <div style="padding-top: 5px;">
-                        <p style="font-size: 0.75rem; color: #718096; margin-top: 0; margin-bottom: 12px;">Génère l'identifiant et le mot de passe de connexion pour ce cabinet.</p>
+                        <p style="font-size: 0.75rem; color: #a0aec0; margin-top: 0; margin-bottom: 12px;">Génère l'identifiant et le mot de passe de connexion pour ce cabinet.</p>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
                             <div class="control-group">
                                 <label>Prénom / Nom</label>
@@ -568,7 +572,7 @@
                         <div class="control-group" id="newAccKineLinkBox" style="display: none; margin-bottom: 12px;">
                             <label>Lier à quel Kiné ?</label>
                             <select id="newAccKineLink"></select>
-                            <small style="color: #718096; font-size: 0.7rem; margin-top: 4px; display: block;">Le compte sera rattaché à l'agenda de ce praticien.</small>
+                            <small style="color: #a0aec0; font-size: 0.7rem; margin-top: 4px; display: block;">Le compte sera rattaché à l'agenda de ce praticien.</small>
                         </div>
                         
                         <button class="btn-save" onclick="createAccount()" style="background-color: #38a169; width: 100%;">Générer le compte et les accès</button>
@@ -576,22 +580,22 @@
                 </details>
 
                 <!-- ACCORDÉON 2 : ABSENCES DU SECRÉTARIAT -->
-                <details style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-                    <summary style="color: #d69e2e; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
+                <details style="margin-top: 15px; border-top: 1px solid #4a5568; padding-top: 15px;">
+                    <summary style="color: #ecc94b; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
                         🏖️ Absences du Secrétariat (Affichage Global)
                     </summary>
                     <div style="padding-top: 5px;">
                         <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-end; flex-wrap: wrap;">
                             <div style="display: flex; flex-direction: column; gap: 2px;">
-                                <label style="font-size: 0.7rem; color: #718096;">Début</label>
+                                <label style="font-size: 0.7rem; color: #a0aec0;">Début</label>
                                 <input type="date" id="newSecAbsenceStart">
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 2px;">
-                                <label style="font-size: 0.7rem; color: #718096;">Fin (inclus)</label>
+                                <label style="font-size: 0.7rem; color: #a0aec0;">Fin (inclus)</label>
                                 <input type="date" id="newSecAbsenceEnd">
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 120px;">
-                                <label style="font-size: 0.7rem; color: #718096;">Message affiché</label>
+                                <label style="font-size: 0.7rem; color: #a0aec0;">Message affiché</label>
                                 <input type="text" id="newSecAbsenceLabel" placeholder="Ex: SEB ABSENT" style="font-weight: bold;">
                             </div>
                             <button class="btn-save" onclick="addSecretariatAbsence()" style="background-color: #d69e2e; height: 32px; margin: 0; padding: 0 15px;">Ajouter</button>
@@ -601,8 +605,8 @@
                 </details>
 
                 <!-- ACCORDÉON 3 : JOURS FÉRIÉS -->
-                <details style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-                    <summary style="color: #dd6b20; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
+                <details style="margin-top: 15px; border-top: 1px solid #4a5568; padding-top: 15px;">
+                    <summary style="color: #f6ad55; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; user-select: none;">
                         📅 Gestion des Jours Fériés (Annuels)
                     </summary>
                     <div style="padding-top: 5px;">
@@ -616,8 +620,8 @@
                 </details>
 
                 <!-- SAUVEGARDE ET RESTAURATION JSON -->
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
-                    <h4 style="margin-bottom: 8px; color: #2d3748;">Sauvegarde et Restauration</h4>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #4a5568;">
+                    <h4 style="margin: 0 0 8px 0; color: #a0aec0;">Sauvegarde et Restauration</h4>
                     <div style="display: flex; gap: 10px;">
                         <button class="btn-save" onclick="exportData()" style="flex: 1;">Exporter JSON</button>
                         <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)">
