@@ -913,7 +913,13 @@
         // --- CONFIGURATION & SUPABASE ---
         const supabaseUrl = 'https://arqjpikvihnduggbwhxz.supabase.co'; // À RENSEIGNER
         const supabaseKey = 'sb_publishable_0a1_NQj3D8vpRart3Qb7Fg_-WoBkBDa'; // À RENSEIGNER
-        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                storage: window.localStorage
+            }
+        });
 
         const START_HOUR = 7, END_HOUR = 20;
         let PIXELS_PER_MINUTE = 2; 
@@ -3686,6 +3692,14 @@
 
         window.loadPatientsFromSupabase = async function() {
             try {
+                // Vérifie si le jeton est encore actif, sinon le renouvelle avant de lire la base
+                let { data: { session } } = await supabaseClient.auth.getSession();
+                if (!session) {
+                    const refreshed = await supabaseClient.auth.refreshSession();
+                    session = refreshed.data?.session;
+                }
+                if (!session) return; // Ne vide pas la liste affichée si la reconnexion est en cours
+
                 const { data, error } = await supabaseClient
                     .from('patients')
                     .select('*')
@@ -3699,6 +3713,16 @@
                 console.error("Erreur chargement patients:", e);
             }
         };
+
+        // Renouvelle automatiquement la session dès qu'on revient sur l'onglet de l'agenda
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && typeof supabaseClient !== 'undefined') {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session) {
+                    await supabaseClient.auth.refreshSession();
+                }
+            }
+        });
 
         // Enregistre ou met à jour automatiquement un patient dans la base
         window.upsertPatientRecord = async function(rawName, phonesArray, noteStr) {
