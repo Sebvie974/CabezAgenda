@@ -421,6 +421,11 @@
                             <input type="checkbox" id="newApptCV" style="width: 15px; height: 15px; cursor: pointer;">
                             <label for="newApptCV" style="margin: 0; cursor: pointer; color: #68d391; font-weight: bold; text-transform: none;">CV 💳</label>
                         </div>
+
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="checkbox" id="newApptDouble" style="width: 15px; height: 15px; cursor: pointer;">
+                            <label for="newApptDouble" style="margin: 0; cursor: pointer; color: #81e6d9; font-weight: bold; text-transform: none;" title="Réduit la bulle de moitié pour laisser place à un 2ème patient">👥 Doublon</label>
+                        </div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
                         <label for="newApptRemaining" style="margin: 0; text-transform: none; color: #a0aec0;">Séances restantes :</label>
@@ -890,6 +895,14 @@
                         <label>Note permanente</label>
                         <input type="text" id="dirPatientNote" placeholder="Ex: Kiné respi, mutuelle, code portail...">
                     </div>
+
+                    <div class="control-group" style="margin: 0;">
+                        <label>👥 Doublon autorisé sur le planning de :</label>
+                        <div id="dirPatientDoubleKines" style="display: flex; flex-wrap: wrap; gap: 12px; padding: 6px 8px; background: rgba(0,0,0,0.15); border-radius: 6px; border: 1px solid #4a5568;">
+                            <!-- Généré automatiquement avec la liste des kinés -->
+                        </div>
+                    </div>
+
                     <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
                         <button type="button" class="btn-cancel" id="dirCancelEditBtn" onclick="resetDirectoryPatientForm()" style="display: none; padding: 5px 10px;">Annuler</button>
                         <button type="button" class="btn-save" onclick="savePatientFromDirectory()" style="background-color: #319795; padding: 6px 15px; margin: 0;">Enregistrer la fiche</button>
@@ -2039,21 +2052,19 @@
 
             const baseDate = getVal('newApptExactDate', new Date().toISOString().split('T')[0]);
 
-            // --- NOUVEAU : VÉRIFICATION DE SÉCURITÉ JOUR FÉRIÉ ---
+            // --- VÉRIFICATION DE SÉCURITÉ JOUR FÉRIÉ ---
             if (baseDate && typeof holidaysConfig !== 'undefined' && holidaysConfig) {
                 const parts = baseDate.split('-');
                 if (parts.length === 3) {
-                    const dayMonth = `${parts[2]}/${parts[1]}`; // Extrait JJ/MM
+                    const dayMonth = `${parts[2]}/${parts[1]}`;
                     const holiday = holidaysConfig.find(h => h.date === dayMonth);
                     if (holiday) {
-                        // Si l'utilisateur clique sur Annuler dans la pop-up, on stoppe tout !
                         if (!confirm(`⚠️ ATTENTION : Le ${dayMonth} est un jour férié (${holiday.name}).\nVoulez-vous vraiment forcer l'ajout de ce rendez-vous ?`)) {
                             return; 
                         }
                     }
                 }
             }
-            // -----------------------------------------------------
 
             const phoneLines = document.querySelectorAll('.phone-line');
             const phonesArray = Array.from(phoneLines).map(line => {
@@ -2068,14 +2079,17 @@
             const recurrenceWeeks = parseInt(getVal('newApptRecurrence', '1')) || 1;
             const selectedDays = Array.from(document.querySelectorAll('.recurrence-day:checked')).map(cb => parseInt(cb.value));
             const patientNameStr = getVal('newPatientName').trim() || 'Patient';
+            const kineIdVal = getVal('newApptKine');
+            const isDoubleVal = getCheck('newApptDouble');
 
             const baseApptData = {
-                kineId: getVal('newApptKine'), dayIndex: parseInt(getVal('newApptDay') || '0'),
+                kineId: kineIdVal, dayIndex: parseInt(getVal('newApptDay') || '0'),
                 timeStr: getVal('newApptTime'), duration: parseInt(getVal('newApptDuration', '30')),
                 patient: patientNameStr, note: currentNote, apptType: getVal('newApptType'),
                 status: getVal('newApptStatus'), isImportant: getCheck('newApptImportant'),
                 isFirstVisit: getCheck('newApptFirstVisit'), isLastVisit: getCheck('newApptLastVisit'),
-                isCV: getCheck('newApptCV'), remainingSessions: remainingVal !== '' ? parseInt(remainingVal) : null,
+                isCV: getCheck('newApptCV'), isDouble: isDoubleVal,
+                remainingSessions: remainingVal !== '' ? parseInt(remainingVal) : null,
                 phones: phonesArray, type: 'rdv'
             };
 
@@ -2138,8 +2152,10 @@
                 });
             }
 
-            updatePatientSuggestions(); 
-            if (typeof upsertPatientRecord === 'function') upsertPatientRecord(patientNameStr, phonesArray, currentNote);
+            updatePatientSuggestions();
+            if (typeof upsertPatientRecord === 'function') {
+                upsertPatientRecord(patientNameStr, phonesArray, currentNote, isDoubleVal, kineIdVal);
+            }
             const mod = document.getElementById('addApptModal');
             if(mod) mod.style.display = 'none'; 
             renderCalendar();
@@ -2203,7 +2219,7 @@
                         if (row.key === 'apptTypesConfig') apptTypesConfig = row.data;
                         if (row.key === 'statusConfig') statusConfig = row.data;
                         if (row.key === 'holidaysConfig') holidaysConfig = row.data;
-                        if (row.key === 'secretariatAbsences') secretariatAbsences = row.data; // Charge tes absences
+                        if (row.key === 'secretariatAbsences') secretariatAbsences = row.data;
                     });
                 }
                 const { data: apptData } = await supabaseClient.from('appointments').select('*');
@@ -2213,6 +2229,7 @@
                         timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
                         apptType: row.appt_type, status: row.status, isImportant: row.is_important,
                         isFirstVisit: row.is_first_visit, isLastVisit: row.is_last_visit, isCV: row.is_cv,
+                        isDouble: row.is_double || false,
                         remainingSessions: row.remaining_sessions, phones: row.phones, vegaPointed: row.vega_pointed,
                         type: row.patient === 'Indisponible' ? 'unavailable' : 'rdv'
                     }));
@@ -2227,7 +2244,7 @@
                     { key: 'apptTypesConfig', data: apptTypesConfig },
                     { key: 'statusConfig', data: statusConfig },
                     { key: 'holidaysConfig', data: holidaysConfig },
-                    { key: 'secretariatAbsences', data: secretariatAbsences } // Sauvegarde tes absences
+                    { key: 'secretariatAbsences', data: secretariatAbsences }
                 ]);
                 if (appointments && appointments.length > 0) {
                     const apptsToSave = appointments.map(a => ({
@@ -2235,7 +2252,8 @@
                         time_str: a.timeStr, duration: a.duration, patient: a.patient, note: a.note,
                         appt_type: a.apptType, status: a.status, is_important: a.isImportant || false,
                         is_first_visit: a.isFirstVisit || false, is_last_visit: a.isLastVisit || false,
-                        is_cv: a.isCV || false, remaining_sessions: a.remainingSessions || null,
+                        is_cv: a.isCV || false, is_double: a.isDouble || false,
+                        remaining_sessions: a.remainingSessions || null,
                         phones: a.phones || [], vega_pointed: a.vegaPointed || false
                     }));
                     await supabaseClient.from('appointments').upsert(apptsToSave);
@@ -3687,7 +3705,7 @@
             if (name) window.openPatientHistoryGlobal(name);
         };
 
-        // --- BASE DE PATIENTS (SUPABASE + AUTO-REMPLISSAGE) ---
+        // --- BASE DE PATIENTS (SUPABASE + AUTO-REMPLISSAGE + DOUBLONS) ---
         let patientsDirectory = [];
 
         window.loadPatientsFromSupabase = async function() {
@@ -3725,7 +3743,7 @@
         });
 
         // Enregistre ou met à jour automatiquement un patient dans la base
-        window.upsertPatientRecord = async function(rawName, phonesArray, noteStr) {
+        window.upsertPatientRecord = async function(rawName, phonesArray, noteStr, isDoubleForKine = false, kineId = null) {
             if (!rawName) return;
             const cleanName = rawName.trim();
             if (!cleanName || cleanName === 'Indisponible' || cleanName === 'Patient') return;
@@ -3735,22 +3753,29 @@
             if (existing) {
                 const updatedPhones = (phonesArray && phonesArray.length > 0) ? phonesArray : (existing.phones || []);
                 const updatedNote = (noteStr !== undefined && noteStr !== null) ? noteStr : (existing.note || '');
+                let updatedDoubleKines = Array.isArray(existing.double_kines) ? [...existing.double_kines] : [];
+
+                if (isDoubleForKine && kineId && !updatedDoubleKines.includes(kineId)) {
+                    updatedDoubleKines.push(kineId);
+                }
 
                 const { error } = await supabaseClient
                     .from('patients')
-                    .update({ name: cleanName, phones: updatedPhones, note: updatedNote })
+                    .update({ name: cleanName, phones: updatedPhones, note: updatedNote, double_kines: updatedDoubleKines })
                     .eq('id', existing.id);
 
                 if (!error) {
                     existing.name = cleanName;
                     existing.phones = updatedPhones;
                     existing.note = updatedNote;
+                    existing.double_kines = updatedDoubleKines;
                     updatePatientSuggestions();
                 }
             } else {
+                const initialDoubleKines = (isDoubleForKine && kineId) ? [kineId] : [];
                 const { data, error } = await supabaseClient
                     .from('patients')
-                    .insert([{ name: cleanName, phones: phonesArray || [], note: noteStr || '' }])
+                    .insert([{ name: cleanName, phones: phonesArray || [], note: noteStr || '', double_kines: initialDoubleKines }])
                     .select();
 
                 if (!error && data && data.length > 0) {
@@ -3805,6 +3830,21 @@
             container.appendChild(row);
         };
 
+        // Coche/décoche automatiquement la case Doublon selon le patient et le kiné sélectionné
+        window.syncApptDoubleCheckbox = function() {
+            const nameVal = (document.getElementById('newPatientName')?.value || '').trim().toLowerCase();
+            const kineVal = document.getElementById('newApptKine')?.value || '';
+            const doubleCb = document.getElementById('newApptDouble');
+            if (!doubleCb) return;
+
+            const found = patientsDirectory.find(p => p.name.trim().toLowerCase() === nameVal);
+            if (found && Array.isArray(found.double_kines)) {
+                doubleCb.checked = found.double_kines.includes(kineVal);
+            } else {
+                doubleCb.checked = false;
+            }
+        };
+
         // Auto-remplissage lors de la saisie du nom dans la modale de RDV
         window.fillPatientData = function(patientName) {
             if (!patientName) return;
@@ -3816,7 +3856,7 @@
             // Repli sur l'historique des RDV si pas encore dans la base
             if (!found && typeof appointments !== 'undefined') {
                 const pastAppt = [...appointments].reverse().find(a => a.patient && a.patient.trim().toLowerCase() === search);
-                if (pastAppt) found = { phones: pastAppt.phones || [], note: pastAppt.note || '' };
+                if (pastAppt) found = { phones: pastAppt.phones || [], note: pastAppt.note || '', double_kines: [] };
             }
 
             if (found) {
@@ -3836,13 +3876,58 @@
                 const noteEl = document.getElementById('newApptNotes');
                 if (noteEl && found.note) noteEl.value = found.note;
             }
+
+            syncApptDoubleCheckbox();
         };
 
+        // Réévalue la case Doublon si on change de praticien dans la modale de RDV
+        document.getElementById('newApptKine')?.addEventListener('change', () => {
+            if (!document.getElementById('editApptId')?.value) {
+                syncApptDoubleCheckbox();
+            }
+        });
+
+        // Initialise la case Doublon à l'ouverture de la modale de RDV (création ou édition)
+        const apptModalEl = document.getElementById('addApptModal');
+        if (apptModalEl) {
+            new MutationObserver(() => {
+                if (apptModalEl.style.display === 'flex') {
+                    const editId = document.getElementById('editApptId')?.value;
+                    const doubleCb = document.getElementById('newApptDouble');
+                    if (!doubleCb) return;
+
+                    if (editId) {
+                        const appt = appointments.find(a => String(a.id) === String(editId));
+                        doubleCb.checked = !!(appt && appt.isDouble);
+                    } else {
+                        syncApptDoubleCheckbox();
+                    }
+                }
+            }).observe(apptModalEl, { attributes: true, attributeFilter: ['style'] });
+        }
+
         // --- GESTION DE LA MODALE RÉPERTOIRE PATIENTS ---
+        window.renderDirectoryKinesCheckboxes = function(selectedKines = []) {
+            const container = document.getElementById('dirPatientDoubleKines');
+            if (!container || typeof kinesConfig === 'undefined') return;
+
+            const activeTitulars = Object.keys(kinesConfig).filter(k => kinesConfig[k].isActive !== false && !kinesConfig[k].isSubstitute);
+            container.innerHTML = activeTitulars.map(kId => {
+                const kine = kinesConfig[kId];
+                const checked = selectedKines.includes(kId) ? 'checked' : '';
+                return `
+                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; margin: 0; font-size: 0.85rem; color: #e2e8f0;">
+                    <input type="checkbox" class="dir-double-kine-cb" value="${kId}" ${checked} style="width: 15px; height: 15px; margin: 0; cursor: pointer;">
+                    <span style="color: ${kine.color}; font-weight: bold;">${kine.name}</span>
+                </label>`;
+            }).join('');
+        };
+
         window.openPatientsDirectoryModal = async function() {
             const modal = document.getElementById('patientsDirectoryModal');
             if (!modal) return;
             modal.style.display = 'flex';
+            renderDirectoryKinesCheckboxes([]);
             await loadPatientsFromSupabase();
             renderPatientsDirectory();
         };
@@ -3871,10 +3956,19 @@
                 const noteStr = p.note ? `<div style="font-size: 0.8rem; color: #fbd38d; margin-top: 3px;">📝 ${p.note}</div>` : '';
                 const safeName = p.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
+                const doubleNames = (p.double_kines || [])
+                    .map(kId => kinesConfig[kId]?.name)
+                    .filter(Boolean);
+                const doubleBadge = doubleNames.length > 0
+                    ? `<span style="background: rgba(129, 230, 217, 0.15); color: #81e6d9; border: 1px solid rgba(129, 230, 217, 0.4); padding: 1px 6px; border-radius: 4px; font-size: 0.72rem; margin-left: 6px;">👥 Doublon : ${doubleNames.join(', ')}</span>`
+                    : '';
+
                 return `
                 <div style="background: rgba(255,255,255,0.06); border: 1px solid #4a5568; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div style="min-width: 0; flex: 1;">
-                        <div style="font-weight: bold; font-size: 1rem; color: #fff;">${p.name}</div>
+                        <div style="font-weight: bold; font-size: 1rem; color: #fff; display: flex; align-items: center; flex-wrap: wrap;">
+                            <span>${p.name}</span>${doubleBadge}
+                        </div>
                         <div style="font-size: 0.85rem; color: #cbd5e0; margin-top: 2px;">${phonesStr}</div>
                         ${noteStr}
                     </div>
@@ -3900,6 +3994,7 @@
             const nameVal = document.getElementById('dirPatientName').value.trim();
             const phonesRaw = document.getElementById('dirPatientPhones').value.trim();
             const noteVal = document.getElementById('dirPatientNote').value.trim();
+            const selectedDoubleKines = Array.from(document.querySelectorAll('.dir-double-kine-cb:checked')).map(cb => cb.value);
 
             if (!nameVal) return alert("Veuillez saisir le nom du patient.");
 
@@ -3914,18 +4009,22 @@
 
                 const { error } = await supabaseClient
                     .from('patients')
-                    .update({ name: nameVal, phones: phonesArray, note: noteVal })
+                    .update({ name: nameVal, phones: phonesArray, note: noteVal, double_kines: selectedDoubleKines })
                     .eq('id', idNum);
 
                 if (!error) {
                     // Propage les modifs sur les RDV existants du patient
                     if (typeof appointments !== 'undefined' && oldName) {
+                        const nowStr = new Date().toISOString().split('T')[0];
                         let changed = false;
                         appointments.forEach(a => {
                             if (a.patient && a.patient.trim().toLowerCase() === oldName.trim().toLowerCase()) {
                                 a.patient = nameVal;
                                 a.phones = [...phonesArray];
                                 a.note = noteVal;
+                                if (a.exactDate >= nowStr) {
+                                    a.isDouble = selectedDoubleKines.includes(a.kineId);
+                                }
                                 changed = true;
                             }
                         });
@@ -3937,9 +4036,18 @@
                     if (typeof renderCalendar === 'function') renderCalendar();
                 }
             } else {
-                await upsertPatientRecord(nameVal, phonesArray, noteVal);
-                resetDirectoryPatientForm();
-                renderPatientsDirectory();
+                const { data, error } = await supabaseClient
+                    .from('patients')
+                    .insert([{ name: nameVal, phones: phonesArray, note: noteVal, double_kines: selectedDoubleKines }])
+                    .select();
+
+                if (!error && data && data.length > 0) {
+                    patientsDirectory.push(data[0]);
+                    patientsDirectory.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+                    updatePatientSuggestions();
+                    resetDirectoryPatientForm();
+                    renderPatientsDirectory();
+                }
             }
         };
 
@@ -3951,6 +4059,7 @@
             document.getElementById('dirPatientName').value = p.name;
             document.getElementById('dirPatientPhones').value = (p.phones || []).join(', ');
             document.getElementById('dirPatientNote').value = p.note || '';
+            renderDirectoryKinesCheckboxes(p.double_kines || []);
 
             document.getElementById('patientFormSummary').innerText = `✏️ Modification : ${p.name}`;
             document.getElementById('dirCancelEditBtn').style.display = 'inline-block';
@@ -3962,6 +4071,7 @@
             document.getElementById('dirPatientName').value = '';
             document.getElementById('dirPatientPhones').value = '';
             document.getElementById('dirPatientNote').value = '';
+            renderDirectoryKinesCheckboxes([]);
             document.getElementById('patientFormSummary').innerText = '➕ Ajouter / Modifier une fiche patient';
             document.getElementById('dirCancelEditBtn').style.display = 'none';
         };
@@ -3975,6 +4085,72 @@
                 renderPatientsDirectory();
             }
         };
+
+        // --- AFFICHAGE DEMI-LARGEUR (50 %) POUR LES CRÉNEAUX DOUBLONS DISPONIBLES ---
+        if (typeof window.createKineColumn === 'function' && !window._doubleBubblePatched) {
+            window._doubleBubblePatched = true;
+            const _origCreateKineColumn = window.createKineColumn;
+
+            window.createKineColumn = function(kId, dayIndex, exactDateStr) {
+                const colEl = _origCreateKineColumn.apply(this, arguments);
+
+                const dayAppts = (appointments || [])
+                    .filter(a => a.kineId === kId && a.exactDate === exactDateStr && a.type !== 'unavailable')
+                    .sort((a, b) => a.timeStr.localeCompare(b.timeStr));
+
+                if (dayAppts.length === 0) return colEl;
+
+                const toMinutes = (tStr) => {
+                    const [h, m] = (tStr || '00:00').split(':').map(Number);
+                    return h * 60 + m;
+                };
+
+                const cards = Array.from(colEl.querySelectorAll('*')).filter(el => {
+                    const isPositioned = el.style.position === 'absolute' || el.classList.contains('appointment') || el.classList.contains('appt-card');
+                    return isPositioned && el.textContent && el.textContent.trim().length > 0;
+                });
+
+                dayAppts.forEach(appt => {
+                    if (!appt.isDouble) return;
+
+                    const startA = toMinutes(appt.timeStr);
+                    const endA = startA + (appt.duration || 30);
+
+                    const overlapping = dayAppts.filter(other => {
+                        const startB = toMinutes(other.timeStr);
+                        const endB = startB + (other.duration || 30);
+                        return startA < endB && endA > startB;
+                    });
+
+                    if (overlapping.length === 1) {
+                        const card = cards.find(el => {
+                            const onclickStr = el.getAttribute('onclick') || '';
+                            return el.dataset?.id == appt.id
+                                || onclickStr.includes(String(appt.id))
+                                || (el.textContent.includes(appt.patient) && el.textContent.includes(appt.timeStr));
+                        }) || cards.find(el => el.textContent.includes(appt.patient));
+
+                        if (card) {
+                            card.style.width = 'calc(50% - 3px)';
+                            card.style.left = '2px';
+                            card.style.right = 'auto';
+                            card.style.borderRight = '2px dashed rgba(255, 255, 255, 0.9)';
+
+                            if (!card.querySelector('.double-slot-badge')) {
+                                const badge = document.createElement('span');
+                                badge.className = 'double-slot-badge';
+                                badge.innerText = '👥 ½';
+                                badge.title = 'Créneau partagé : 2ème place disponible à droite';
+                                badge.style.cssText = 'background: rgba(0,0,0,0.3); color: #fff; padding: 1px 4px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; margin-left: 4px; vertical-align: middle;';
+                                card.appendChild(badge);
+                            }
+                        }
+                    }
+                });
+
+                return colEl;
+            };
+        }
 
         // Charge la base de patients dès l'ouverture de l'agenda
         setTimeout(() => {
