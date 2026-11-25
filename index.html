@@ -2241,9 +2241,11 @@
         let secretariatAbsences = []; // NOUVEAU : Base pour tes absences
 
         // --- SAUVEGARDE ET CHARGEMENT ---
+        window.pendingPointages = window.pendingPointages || {};
+
         async function loadDataFromSupabase() {
             try {
-                const { data: configData, error: configError } = await supabaseClient.from('app_config').select('*');
+                const { data: configData } = await supabaseClient.from('app_config').select('*');
                 if (configData && configData.length > 0) {
                     configData.forEach(row => {
                         if (row.key === 'kinesConfig') kinesConfig = row.data;
@@ -2255,15 +2257,23 @@
                 }
                 const { data: apptData } = await supabaseClient.from('appointments').select('*');
                 if (apptData) {
-                    appointments = apptData.map(row => ({
-                        id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
-                        timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
-                        apptType: row.appt_type, status: row.status, isImportant: row.is_important,
-                        isFirstVisit: row.is_first_visit, isLastVisit: row.is_last_visit, isCV: row.is_cv,
-                        isDouble: row.is_double || false,
-                        remainingSessions: row.remaining_sessions, phones: row.phones, vegaPointed: row.vega_pointed,
-                        type: row.patient === 'Indisponible' ? 'unavailable' : 'rdv'
-                    }));
+                    const now = Date.now();
+                    appointments = apptData.map(row => {
+                        const pending = window.pendingPointages[row.id];
+                        const isProtected = pending && now < pending.expiresAt;
+                        if (pending && !isProtected) delete window.pendingPointages[row.id];
+
+                        return {
+                            id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
+                            timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
+                            apptType: row.appt_type, status: row.status, isImportant: row.is_important,
+                            isFirstVisit: row.is_first_visit, isLastVisit: row.is_last_visit, isCV: row.is_cv,
+                            isDouble: row.is_double || false,
+                            remainingSessions: row.remaining_sessions, phones: row.phones,
+                            vegaPointed: isProtected ? pending.value : (row.vega_pointed || false),
+                            type: row.patient === 'Indisponible' ? 'unavailable' : 'rdv'
+                        };
+                    });
                 }
             } catch (error) { console.error("Erreur de chargement Supabase:", error); }
         }
@@ -2779,12 +2789,17 @@
                         el.addEventListener('click', (e) => { 
                             e.stopPropagation(); 
                             if (window.isSecretariatMode) {
-                                appt.vegaPointed = !appt.vegaPointed;
-                                const idx = appointments.findIndex(a => a.id === appt.id);
-                                if (idx !== -1) appointments[idx].vegaPointed = appt.vegaPointed;
-                                saveData();
+                                const newState = !appt.vegaPointed;
+                                if (typeof window.toggleSinglePointage === 'function') {
+                                    window.toggleSinglePointage(appt.id, newState);
+                                } else {
+                                    appt.vegaPointed = newState;
+                                    saveData();
+                                }
                                 renderCalendar();
-                            } else openEditModal(appt.id); 
+                            } else {
+                                openEditModal(appt.id); 
+                            }
                         });
                     }
                     col.appendChild(el);
@@ -4625,6 +4640,43 @@
         setTimeout(() => {
             if (typeof loadPatientsFromSupabase === 'function') loadPatientsFromSupabase();
         }, 1200);
+
+        window.toggleSinglePointage = async function(apptId, isPointed) {
+            const appt = appointments.find(a => String(a.id) === String(apptId));
+            if (!appt) return;
+
+            // 1. Mise à jour immédiate + verrou anti-écrasement de 5 secondes
+            appt.vegaPointed = isPointed;
+            window.pendingPointages[appt.id] = {
+                value: isPointed,
+                expiresAt: Date.now() + 5000
+            };
+
+            try {
+                // 2. Vérifie que la session mobile est bien active avant d'écrire
+                let { data: { session } } = await supabaseClient.auth.getSession();
+                if (!session) {
+                    const refreshed = await supabaseClient.auth.refreshSession();
+                    session = refreshed.data?.session;
+                }
+                if (!session) throw new Error("Session expirée");
+
+                // 3. Met à jour UNIQUEMENT ce rendez-vous (requête ultra-légère sur mobile)
+                const { error } = await supabaseClient
+                    .from('appointments')
+                    .update({ vega_pointed: isPointed })
+                    .eq('id', appt.id);
+
+                if (error) throw error;
+            } catch (err) {
+                // 4. Si le réseau mobile a coupé, on décoche visuellement et on prévient immédiatement
+                console.error("Échec du pointage :", err);
+                delete window.pendingPointages[appt.id];
+                appt.vegaPointed = !isPointed;
+                if (typeof renderCalendar === 'function') renderCalendar();
+                alert("⚠️ Connexion instable : le pointage n'a pas pu être enregistré. Vérifie ton réseau et recoche la séance.");
+            }
+        };
     </script>
 </body>
 </html>
