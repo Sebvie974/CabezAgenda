@@ -2074,7 +2074,8 @@
             }).filter(val => val !== '');
             
             const editId = getVal('editApptId');
-            const remainingVal = getVal('newApptRemaining');
+            const remainingVal = getVal('newApptRemaining').trim();
+            const parsedRemaining = remainingVal !== '' ? parseInt(remainingVal, 10) : null;
             const currentNote = getVal('newApptNotes').trim();
             const recurrenceWeeks = parseInt(getVal('newApptRecurrence', '1')) || 1;
             const selectedDays = Array.from(document.querySelectorAll('.recurrence-day:checked')).map(cb => parseInt(cb.value));
@@ -2089,19 +2090,28 @@
                 status: getVal('newApptStatus'), isImportant: getCheck('newApptImportant'),
                 isFirstVisit: getCheck('newApptFirstVisit'), isLastVisit: getCheck('newApptLastVisit'),
                 isCV: getCheck('newApptCV'), isDouble: isDoubleVal,
-                remainingSessions: remainingVal !== '' ? parseInt(remainingVal) : null,
+                remainingSessions: parsedRemaining,
                 phones: phonesArray, type: 'rdv'
             };
 
             let oldPatientName = null;
+            let anchorId = null;
+            let anchorValue = undefined;
 
             if (editId) {
-                baseApptData.id = parseInt(editId);
+                baseApptData.id = parseInt(editId, 10);
                 baseApptData.exactDate = baseDate;
                 const index = appointments.findIndex(a => a.id === baseApptData.id);
                 if (index !== -1) {
-                    oldPatientName = appointments[index].patient;
+                    const prevAppt = appointments[index];
+                    oldPatientName = prevAppt.patient;
                     appointments[index] = baseApptData;
+
+                    // Si le RDV n'est pas annulé >24h et que le compteur a été saisi/modifié, il devient le nouveau point de départ
+                    if (!window.isApptCancelled24h(baseApptData) && parsedRemaining !== prevAppt.remainingSessions) {
+                        anchorId = baseApptData.id;
+                        anchorValue = parsedRemaining;
+                    }
                 }
             } else {
                 const dateParts = baseDate ? baseDate.split('-') : [];
@@ -2112,10 +2122,10 @@
                 const mondayObj = new Date(startDateObj);
                 mondayObj.setDate(startDateObj.getDate() - currentDayOfWeek + 1);
 
-                if(selectedDays.length === 0) selectedDays.push(currentDayOfWeek);
+                if (selectedDays.length === 0) selectedDays.push(currentDayOfWeek);
 
                 let iterationCount = 0;
-                let sessionsLeft = baseApptData.remainingSessions;
+                const createdAppts = [];
 
                 for (let w = 0; w < recurrenceWeeks; w++) {
                     for (let d of selectedDays) {
@@ -2127,17 +2137,26 @@
                         const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
                         const dd = String(nextDate.getDate()).padStart(2, '0');
 
-                        const safeId = Math.floor(Math.random() * 1000000000) + 1000;
-                        const newAppt = { ...baseApptData, id: safeId, exactDate: `${yyyy}-${mm}-${dd}`, dayIndex: d - 1 };
+                        const safeId = Math.floor(Math.random() * 1000000000) + 1000 + iterationCount;
+                        const newAppt = {
+                            ...baseApptData,
+                            id: safeId,
+                            exactDate: `${yyyy}-${mm}-${dd}`,
+                            dayIndex: d - 1,
+                            remainingSessions: iterationCount === 0 ? parsedRemaining : null
+                        };
                         
-                        if (sessionsLeft !== null) {
-                            newAppt.remainingSessions = Math.max(0, sessionsLeft - iterationCount);
-                            if (newAppt.remainingSessions === 0 && iterationCount > 0) newAppt.isLastVisit = true;
-                        }
                         if (iterationCount > 0) newAppt.isFirstVisit = false;
                         appointments.push(newAppt);
+                        createdAppts.push(newAppt);
                         iterationCount++;
                     }
+                }
+
+                if (createdAppts.length > 0 && parsedRemaining !== null) {
+                    createdAppts.sort((a, b) => a.exactDate.localeCompare(b.exactDate) || a.timeStr.localeCompare(b.timeStr));
+                    anchorId = createdAppts[0].id;
+                    anchorValue = parsedRemaining;
                 }
             }
 
@@ -2147,19 +2166,32 @@
                         a.patient = patientNameStr;
                     }
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
-                        a.phones = [...phonesArray]; a.note = currentNote;
+                        a.phones = [...phonesArray];
+                        a.note = currentNote;
                     }
                 });
             }
+
+            // Recalcul chronologique des séances restantes (en ignorant les annulations > 24h)
+            const calcResult = (typeof window.recalculatePatientSessions === 'function')
+                ? window.recalculatePatientSessions(patientNameStr, anchorId, anchorValue)
+                : { exceeded: false, lastDate: null };
 
             updatePatientSuggestions();
             if (typeof upsertPatientRecord === 'function') {
                 upsertPatientRecord(patientNameStr, phonesArray, currentNote, isDoubleVal, kineIdVal);
             }
+
             const mod = document.getElementById('addApptModal');
-            if(mod) mod.style.display = 'none'; 
+            if (mod) mod.style.display = 'none'; 
             renderCalendar();
             saveData();
+
+            // Alerte si le dernier RDV de l'ordonnance était déjà atteint et que le nombre de séances est dépassé
+            if (!editId && calcResult && calcResult.exceeded && calcResult.lastDate) {
+                const frLastDate = window.formatDateFrLong(calcResult.lastDate);
+                alert(`⚠️ Attention : le nombre de séances prévues pour ${patientNameStr} a été dépassé !\n\nLa dernière séance de l'ordonnance était atteinte le ${frLastDate}.`);
+            }
         };
 
         function renderTimeAxis() {
@@ -3227,6 +3259,182 @@
             }
         };
 
+        // --- CALCUL AUTOMATIQUE DES SÉANCES RESTANTES ---
+        window.isApptCancelled24h = function(appt) {
+            if (!appt || !appt.status) return false;
+            if (appt.status === 'cancelled_24h') return true;
+            if (typeof statusConfig !== 'undefined' && statusConfig[appt.status]) {
+                const label = (statusConfig[appt.status].label || statusConfig[appt.status].name || '').toLowerCase();
+                if (label.includes('24h') || label.includes('24 h')) return true;
+            }
+            return false;
+        };
+
+        window.formatDateFrLong = function(isoDateStr) {
+            if (!isoDateStr) return '';
+            const parts = isoDateStr.split('-');
+            if (parts.length !== 3) return isoDateStr;
+            const joursFr = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            const dObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            return `${joursFr[dObj.getDay()]} ${parts[2]}/${parts[1]}/${parts[0]}`;
+        };
+
+        window.recalculatePatientSessions = function(patientName, anchorId = null, anchorValue = undefined) {
+            if (!patientName || patientName === 'Indisponible' || patientName === 'Patient') {
+                return { exceeded: false, lastDate: null };
+            }
+
+            const patAppts = appointments
+                .filter(a => a.type !== 'unavailable' && a.patient && a.patient.trim().toLowerCase() === patientName.trim().toLowerCase())
+                .sort((a, b) => {
+                    const d = (a.exactDate || '').localeCompare(b.exactDate || '');
+                    if (d !== 0) return d;
+                    const t = (a.timeStr || '').localeCompare(b.timeStr || '');
+                    if (t !== 0) return t;
+                    return (a.id || 0) - (b.id || 0);
+                });
+
+            if (patAppts.length === 0) return { exceeded: false, lastDate: null };
+
+            if (anchorId !== null && anchorValue !== undefined) {
+                const anchorIdx = patAppts.findIndex(a => String(a.id) === String(anchorId));
+                if (anchorIdx !== -1) {
+                    if (anchorValue === null || anchorValue === '') {
+                        for (let i = anchorIdx; i < patAppts.length; i++) {
+                            patAppts[i].remainingSessions = null;
+                            patAppts[i].isLastVisit = false;
+                        }
+                    } else {
+                        let counter = parseInt(anchorValue, 10);
+                        for (let i = anchorIdx; i < patAppts.length; i++) {
+                            const appt = patAppts[i];
+                            if (window.isApptCancelled24h(appt)) {
+                                appt.remainingSessions = null;
+                                appt.isLastVisit = false;
+                            } else if (counter >= 0) {
+                                appt.remainingSessions = counter;
+                                appt.isLastVisit = (counter === 0);
+                                counter--;
+                            } else {
+                                appt.remainingSessions = null;
+                                appt.isLastVisit = false;
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Recalcul global (changement de statut en Annulé > 24h, suppression ou ajout de séance)
+                let counter = null;
+                for (let i = 0; i < patAppts.length; i++) {
+                    const appt = patAppts[i];
+                    if (window.isApptCancelled24h(appt)) {
+                        appt.remainingSessions = null;
+                        appt.isLastVisit = false;
+                        continue;
+                    }
+                    const hasValue = appt.remainingSessions !== null && appt.remainingSessions !== undefined && appt.remainingSessions !== '';
+                    if (counter === null || (counter < 0 && hasValue && parseInt(appt.remainingSessions, 10) > 0)) {
+                        if (hasValue) {
+                            counter = parseInt(appt.remainingSessions, 10);
+                            appt.remainingSessions = counter;
+                            appt.isLastVisit = (counter === 0);
+                            counter--;
+                        }
+                    } else if (counter >= 0) {
+                        appt.remainingSessions = counter;
+                        appt.isLastVisit = (counter === 0);
+                        counter--;
+                    } else {
+                        appt.remainingSessions = null;
+                        appt.isLastVisit = false;
+                    }
+                }
+            }
+
+            // Détecte si la dernière séance (0 restante) est atteinte et s'il existe des RDVs après elle
+            let lastZeroIndex = -1;
+            for (let i = 0; i < patAppts.length; i++) {
+                if (!window.isApptCancelled24h(patAppts[i]) && patAppts[i].remainingSessions === 0) {
+                    lastZeroIndex = i;
+                }
+            }
+
+            if (lastZeroIndex !== -1) {
+                const lastZeroAppt = patAppts[lastZeroIndex];
+                const extraValidAppts = patAppts
+                    .slice(lastZeroIndex + 1)
+                    .filter(a => !window.isApptCancelled24h(a));
+
+                if (extraValidAppts.length > 0) {
+                    return {
+                        exceeded: true,
+                        lastDate: lastZeroAppt.exactDate,
+                        extraCount: extraValidAppts.length
+                    };
+                }
+            }
+
+            return { exceeded: false, lastDate: lastZeroIndex !== -1 ? patAppts[lastZeroIndex].exactDate : null };
+        };
+
+        // Recalcule automatiquement les séances restantes si on supprime un RDV du patient
+        if (typeof window.deleteAppointment === 'function' && !window._deleteRecalcPatched) {
+            window._deleteRecalcPatched = true;
+            const _origDeleteAppointment = window.deleteAppointment;
+            window.deleteAppointment = function() {
+                const editId = document.getElementById('editApptId')?.value;
+                const targetAppt = editId ? appointments.find(a => String(a.id) === String(editId)) : null;
+                const patName = targetAppt ? targetAppt.patient : null;
+
+                _origDeleteAppointment.apply(this, arguments);
+
+                if (patName) {
+                    window.recalculatePatientSessions(patName);
+                    if (typeof renderCalendar === 'function') renderCalendar();
+                    if (typeof saveData === 'function') saveData();
+                }
+            };
+        }
+
+        // Affiche un rappel visuel dans la modale de prise de RDV si le patient a déjà atteint sa dernière séance
+        if (typeof window.fillPatientData === 'function' && !window._fillQuotaWarningPatched) {
+            window._fillQuotaWarningPatched = true;
+            const _origFillPatientData = window.fillPatientData;
+            window.fillPatientData = function(patientName) {
+                _origFillPatientData.apply(this, arguments);
+
+                const remInput = document.getElementById('newApptRemaining');
+                if (!remInput) return;
+                const parentBox = remInput.closest('.options-box') || remInput.parentElement;
+                let warnEl = document.getElementById('apptQuotaWarningMsg');
+                if (!warnEl && parentBox) {
+                    warnEl = document.createElement('div');
+                    warnEl.id = 'apptQuotaWarningMsg';
+                    warnEl.style.cssText = 'display: none; width: 100%; font-size: 0.78rem; color: #fbd38d; background: rgba(221, 107, 32, 0.25); border: 1px solid #ed8936; padding: 4px 8px; border-radius: 4px; margin-top: 2px;';
+                    parentBox.appendChild(warnEl);
+                }
+                if (!warnEl) return;
+
+                if (!patientName) {
+                    warnEl.style.display = 'none';
+                    return;
+                }
+
+                const patAppts = (appointments || [])
+                    .filter(a => a.type !== 'unavailable' && !window.isApptCancelled24h(a) && a.patient && a.patient.trim().toLowerCase() === patientName.trim().toLowerCase())
+                    .sort((a, b) => (a.exactDate || '').localeCompare(b.exactDate || '') || (a.timeStr || '').localeCompare(b.timeStr || ''));
+
+                const lastTracked = [...patAppts].reverse().find(a => a.remainingSessions !== null && a.remainingSessions !== undefined && a.remainingSessions !== '');
+                if (lastTracked && parseInt(lastTracked.remainingSessions, 10) === 0) {
+                    warnEl.innerText = `⚠️ Dernière séance (0 rest.) atteinte le ${window.formatDateFrLong(lastTracked.exactDate)}.`;
+                    warnEl.style.display = 'block';
+                } else {
+                    warnEl.style.display = 'none';
+                }
+            };
+        }
+
+        // --- AFFICHAGE DU DOSSIER PATIENT AVEC SÉANCES RESTANTES ---
         window.openPatientHistoryGlobal = function(patientName) {
             if (!patientName) return;
 
@@ -3236,53 +3444,99 @@
 
             if (!histMod || !histContent || !histTitle) return;
 
-            histTitle.innerText = "Rendez-vous à venir : " + patientName;
+            histTitle.innerText = "Dossier : " + patientName;
 
             const now = new Date();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const joursFr = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
-            const patAppts = appointments.filter(a => 
-                a.patient && a.patient.toLowerCase() === patientName.toLowerCase() && a.exactDate >= todayStr
-            ).sort((a, b) => {
-                const dateDiff = new Date(a.exactDate) - new Date(b.exactDate);
-                if (dateDiff === 0) return a.timeStr.localeCompare(b.timeStr); 
-                return dateDiff;
-            });
+            const allPatAppts = appointments.filter(a => 
+                a.type !== 'unavailable' && a.patient && a.patient.toLowerCase() === patientName.toLowerCase()
+            );
 
-            if (patAppts.length === 0) {
-                histContent.innerHTML = "<p style='padding: 10px; color: #718096;'>Aucun rendez-vous à venir trouvé pour ce patient.</p>";
-            } else {
-                let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 5px;">';
-                
-                // Tableau pour traduire le jour de la semaine
-                const joursFr = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            const upcomingAppts = allPatAppts
+                .filter(a => a.exactDate >= todayStr)
+                .sort((a, b) => {
+                    const dateDiff = new Date(a.exactDate) - new Date(b.exactDate);
+                    return dateDiff === 0 ? a.timeStr.localeCompare(b.timeStr) : dateDiff;
+                });
 
-                patAppts.forEach(appt => {
+            const pastAppts = allPatAppts
+                .filter(a => a.exactDate < todayStr)
+                .sort((a, b) => {
+                    const dateDiff = new Date(b.exactDate) - new Date(a.exactDate);
+                    return dateDiff === 0 ? b.timeStr.localeCompare(a.timeStr) : dateDiff;
+                });
+
+            const buildCardsHtml = (list, emptyMsg, isPastList) => {
+                if (list.length === 0) {
+                    return `<p style='padding: 15px 5px; color: #718096; text-align: center; font-style: italic;'>${emptyMsg}</p>`;
+                }
+
+                return list.map(appt => {
                     const kineObj = kinesConfig[appt.kineId];
                     const kineName = kineObj ? kineObj.name : 'Inconnu';
                     const kineColor = kineObj ? kineObj.color : '#718096';
-                    
+
                     const dParts = appt.exactDate.split('-');
                     let frDate = appt.exactDate;
-                    
                     if (dParts.length === 3) {
-                        const dateObj = new Date(appt.exactDate);
-                        const nomJour = joursFr[dateObj.getDay()]; // Récupère le nom du jour
+                        const dateObj = new Date(dParts[0], dParts[1] - 1, dParts[2]);
+                        const nomJour = joursFr[dateObj.getDay()];
                         frDate = `${nomJour} ${dParts[2]}/${dParts[1]}/${dParts[0]}`;
                     }
 
-                    html += `
-                    <div style="background-color: ${kineColor}; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                        <div style="color: white;">
-                            <div style="font-weight: bold; font-size: 1.1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">${frDate} à ${appt.timeStr}</div>
-                            <div style="font-size: 0.95rem; margin-top: 4px; opacity: 0.95;">Avec ${kineName}</div>
+                    let statusBadge = '';
+                    if (window.isApptCancelled24h(appt)) {
+                        statusBadge = `<span style="background: rgba(0,0,0,0.28); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 6px;">🔄 Annulé >24h</span>`;
+                    } else if (appt.status === 'no_show') {
+                        statusBadge = `<span style="background: rgba(0,0,0,0.28); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 6px;">⚠️ Absent</span>`;
+                    } else if (appt.status === 'cancelled_today') {
+                        statusBadge = `<span style="background: rgba(0,0,0,0.28); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 6px;">❌ Annulé</span>`;
+                    }
+
+                    let remainingBadge = '';
+                    if (!window.isApptCancelled24h(appt) && appt.remainingSessions !== null && appt.remainingSessions !== undefined && appt.remainingSessions !== '') {
+                        const remNum = parseInt(appt.remainingSessions, 10);
+                        if (remNum === 0 || appt.isLastVisit) {
+                            remainingBadge = `<span style="background: rgba(246, 173, 85, 0.35); border: 1px solid rgba(255,255,255,0.65); padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 6px;">🏁 Dernière (0 rest.)</span>`;
+                        } else {
+                            remainingBadge = `<span style="background: rgba(255,255,255,0.22); padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 6px;">🔢 ${remNum} rest.</span>`;
+                        }
+                    }
+
+                    return `
+                    <div style="background-color: ${kineColor}; opacity: ${isPastList ? '0.88' : '1'}; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; box-shadow: 0 3px 5px rgba(0,0,0,0.1);">
+                        <div style="color: white; min-width: 0;">
+                            <div style="font-weight: bold; font-size: 1.05rem; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">${frDate} à ${appt.timeStr}</div>
+                            <div style="font-size: 0.9rem; margin-top: 4px; opacity: 0.95; display: flex; flex-wrap: wrap; align-items: center; gap: 2px;">
+                                <span>Avec ${kineName}</span>${statusBadge}${remainingBadge}
+                            </div>
                         </div>
-                        <button onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 8px 16px; font-size: 0.9rem; background-color: white; color: ${kineColor}; border: none; border-radius: 6px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer;">Aller à</button>
+                        <button onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 8px 14px; font-size: 0.85rem; background-color: white; color: ${kineColor}; border: none; border-radius: 6px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer; flex-shrink: 0;">Aller à</button>
                     </div>`;
-                });
-                html += '</div>';
-                histContent.innerHTML = html;
-            }
+                }).join('');
+            };
+
+            histContent.innerHTML = `
+                <div style="display: flex; border-bottom: 1px solid #e2e8f0; margin-bottom: 12px; gap: 5px;">
+                    <button id="tabBtnUpcoming" onclick="window.switchPatientHistoryTab('upcoming')" style="flex: 1; background: none; border: none; border-bottom: 3px solid #3182ce; color: #2b6cb0; font-weight: bold; padding: 10px 5px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;">
+                        📅 À venir (${upcomingAppts.length})
+                    </button>
+                    <button id="tabBtnPast" onclick="window.switchPatientHistoryTab('past')" style="flex: 1; background: none; border: none; border-bottom: 3px solid transparent; color: #718096; font-weight: normal; padding: 10px 5px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;">
+                        📜 Historique (${pastAppts.length})
+                    </button>
+                </div>
+
+                <div id="tabContentUpcoming" style="display: flex; flex-direction: column; gap: 10px; padding: 2px;">
+                    ${buildCardsHtml(upcomingAppts, "Aucun rendez-vous à venir pour ce patient.", false)}
+                </div>
+
+                <div id="tabContentPast" style="display: none; flex-direction: column; gap: 10px; padding: 2px;">
+                    ${buildCardsHtml(pastAppts, "Aucun rendez-vous passé dans l'historique.", true)}
+                </div>
+            `;
+
             histMod.style.display = 'flex';
         };
 
