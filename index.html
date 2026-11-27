@@ -501,9 +501,15 @@
                 </div>
 
                 <!-- Notes -->
-                <div class="control-group">
-                    <label>Notes</label>
-                    <textarea id="newApptNotes" placeholder="Détails, matériel à préparer..." style="min-height: 40px; height: 45px;"></textarea>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Note patient (globale)</label>
+                        <textarea id="newApptNotes" placeholder="Infos permanentes du patient..." style="min-height: 42px; height: 46px;"></textarea>
+                    </div>
+                    <div class="control-group">
+                        <label style="color: #81e6d9;">📌 Note de ce RDV uniquement</label>
+                        <textarea id="newApptRdvNote" placeholder="Ex: Apporter radio, bilan..." style="min-height: 42px; height: 46px;"></textarea>
+                    </div>
                 </div>
                 
                 <input type="hidden" id="editApptId"><input type="hidden" id="newApptDay">
@@ -2085,6 +2091,7 @@
             const remainingVal = getVal('newApptRemaining').trim();
             const parsedRemaining = remainingVal !== '' ? parseInt(remainingVal, 10) : null;
             const currentNote = getVal('newApptNotes').trim();
+            const currentRdvNote = getVal('newApptRdvNote').trim();
             const statusVal = getVal('newApptStatus');
             const cancelReasonVal = (typeof window.isCancellationStatus === 'function' && window.isCancellationStatus(statusVal))
                 ? getVal('newApptCancelReason').trim()
@@ -2098,8 +2105,8 @@
             const baseApptData = {
                 kineId: kineIdVal, dayIndex: parseInt(getVal('newApptDay') || '0'),
                 timeStr: getVal('newApptTime'), duration: parseInt(getVal('newApptDuration', '30')),
-                patient: patientNameStr, note: currentNote, cancelReason: cancelReasonVal,
-                apptType: getVal('newApptType'),
+                patient: patientNameStr, note: currentNote, rdvNote: currentRdvNote,
+                cancelReason: cancelReasonVal, apptType: getVal('newApptType'),
                 status: statusVal, isImportant: getCheck('newApptImportant'),
                 isFirstVisit: getCheck('newApptFirstVisit'),
                 isLastVisit: getCheck('newApptLastVisit') || parsedRemaining === 0,
@@ -2156,6 +2163,7 @@
                             id: safeId,
                             exactDate: `${yyyy}-${mm}-${dd}`,
                             dayIndex: d - 1,
+                            rdvNote: iterationCount === 0 ? currentRdvNote : '',
                             remainingSessions: iterationCount === 0 ? parsedRemaining : null,
                             isLastVisit: iterationCount === 0 ? (parsedRemaining === 0) : false
                         };
@@ -2182,7 +2190,7 @@
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
                         a.phones = [...phonesArray];
                         a.note = currentNote;
-                        // cancelReason reste volontairement unique à ce RDV
+                        // rdvNote et cancelReason restent strictement propres à ce RDV
                     }
                 });
             }
@@ -2257,8 +2265,6 @@
         // --- SAUVEGARDE ET CHARGEMENT ---
         window.pendingPointages = window.pendingPointages || {};
 
-        window.pendingPointages = window.pendingPointages || {};
-
         async function loadDataFromSupabase() {
             try {
                 const { data: configData } = await supabaseClient.from('app_config').select('*');
@@ -2281,8 +2287,8 @@
 
                         return {
                             id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
-                            timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
-                            cancelReason: row.cancel_reason || '',
+                            timeStr: row.time_str, duration: row.duration, patient: row.patient,
+                            note: row.note, rdvNote: row.rdv_note || '', cancelReason: row.cancel_reason || '',
                             apptType: row.appt_type, status: row.status, isImportant: row.is_important,
                             isFirstVisit: row.is_first_visit, isLastVisit: row.is_last_visit, isCV: row.is_cv,
                             isDouble: row.is_double || false,
@@ -2307,8 +2313,8 @@
                 if (appointments && appointments.length > 0) {
                     const apptsToSave = appointments.map(a => ({
                         id: a.id, kine_id: a.kineId, day_index: a.dayIndex, exact_date: a.exactDate,
-                        time_str: a.timeStr, duration: a.duration, patient: a.patient, note: a.note,
-                        cancel_reason: a.cancelReason || '',
+                        time_str: a.timeStr, duration: a.duration, patient: a.patient,
+                        note: a.note, rdv_note: a.rdvNote || '', cancel_reason: a.cancelReason || '',
                         appt_type: a.apptType, status: a.status, is_important: a.isImportant || false,
                         is_first_visit: a.isFirstVisit || false, is_last_visit: a.isLastVisit || false,
                         is_cv: a.isCV || false, is_double: a.isDouble || false,
@@ -2761,12 +2767,14 @@
                         if (appt.isCV) tooltipContent += '🟩 CARTE VITALE À DEMANDER\n';
                         if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) tooltipContent += `⏳ ${appt.remainingSessions} séance(s) restante(s)\n`;
                         if (appt.phones && appt.phones.length > 0) tooltipContent += `📞 ${appt.phones.join(' / ')}\n`;
+                        if (appt.rdvNote && appt.rdvNote.trim().length > 0) tooltipContent += `📌 Note RDV: ${appt.rdvNote}\n`;
                         if (appt.note && appt.note.length > 0) tooltipContent += `📝 ${appt.note}`;
                         
                         let iconHtml = '';
                         if (appt.isImportant) iconHtml += '<span class="note-icon">⚠️</span>';
                         if (appt.isLastVisit) iconHtml += '<span class="note-icon">🛑</span>';
                         if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) iconHtml += '<span class="note-icon">⏳</span>';
+                        if (appt.rdvNote && appt.rdvNote.trim().length > 0) iconHtml += '<span class="note-icon" title="Note spécifique à ce RDV">📌</span>';
                         if (appt.note && appt.note.trim().length > 0) iconHtml += '<span class="note-icon">📝</span>';
 
                         let cvIconHtml = appt.isCV ? '<span class="note-icon" style="background-color: #38a169; color: white; padding: 1px 4px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; border: 1px solid #276749;">CV</span>' : '';
@@ -2809,6 +2817,21 @@
                             </div>
                             <div class="note-tooltip">${tooltipContent.trim()}</div>
                         `;
+
+                        // Empêche la bulle d'infos de dépasser le bord droit de l'écran (ex: colonne du vendredi)
+                        el.addEventListener('mouseenter', () => {
+                            const tooltip = el.querySelector('.note-tooltip');
+                            if (!tooltip) return;
+                            const rect = el.getBoundingClientRect();
+                            const tipWidth = tooltip.offsetWidth || 230;
+                            if (rect.left + tipWidth > window.innerWidth - 12 || dayIndex >= 4) {
+                                tooltip.style.left = 'auto';
+                                tooltip.style.right = '0';
+                            } else {
+                                tooltip.style.left = '0';
+                                tooltip.style.right = 'auto';
+                            }
+                        });
                         
                         el.addEventListener('click', (e) => { 
                             e.stopPropagation(); 
@@ -4140,7 +4163,7 @@
             window.toggleCancelReasonField();
         });
 
-        // Synchronise les cases Doublon, Dernier et le Motif d'annulation à l'ouverture de la modale de RDV
+        // Synchronise les cases Doublon, Dernier, la note du RDV et le Motif d'annulation à l'ouverture de la modale
         const apptModalEl = document.getElementById('addApptModal');
         if (apptModalEl) {
             new MutationObserver(() => {
@@ -4149,14 +4172,17 @@
                     const doubleCb = document.getElementById('newApptDouble');
                     const lastCb = document.getElementById('newApptLastVisit');
                     const reasonInput = document.getElementById('newApptCancelReason');
+                    const rdvNoteInput = document.getElementById('newApptRdvNote');
 
                     if (editId) {
                         const appt = appointments.find(a => String(a.id) === String(editId));
                         if (doubleCb) doubleCb.checked = !!(appt && appt.isDouble);
                         if (lastCb) lastCb.checked = !!(appt && (appt.isLastVisit || appt.remainingSessions === 0));
                         if (reasonInput) reasonInput.value = (appt && appt.cancelReason) ? appt.cancelReason : '';
+                        if (rdvNoteInput) rdvNoteInput.value = (appt && appt.rdvNote) ? appt.rdvNote : '';
                     } else {
                         if (reasonInput) reasonInput.value = '';
+                        if (rdvNoteInput) rdvNoteInput.value = '';
                         syncApptDoubleCheckbox();
                     }
                     window.toggleCancelReasonField();
@@ -4298,7 +4324,7 @@
             };
         }
 
-        // --- DOSSIER PATIENT (ONGLETS À VENIR / HISTORIQUE + SÉANCES + MOTIF) ---
+        // --- DOSSIER PATIENT (ONGLETS À VENIR / HISTORIQUE + SÉANCES + NOTES RDV) ---
         window.switchPatientHistoryTab = function(tabName) {
             const tabUpcoming = document.getElementById('tabBtnUpcoming');
             const tabPast = document.getElementById('tabBtnPast');
@@ -4400,6 +4426,10 @@
                         remainingBadge = `<span style="background: rgba(246, 173, 85, 0.35); border: 1px solid rgba(255,255,255,0.65); padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 6px;">🏁 Dernière</span>`;
                     }
 
+                    const rdvNoteHtml = (appt.rdvNote && appt.rdvNote.trim().length > 0)
+                        ? `<div style="font-size: 0.8rem; margin-top: 5px; background: rgba(255,255,255,0.18); padding: 3px 8px; border-radius: 4px; display: inline-block; margin-right: 5px;">📌 ${appt.rdvNote}</div>`
+                        : '';
+
                     const cancelReasonHtml = (appt.cancelReason && appt.cancelReason.trim().length > 0)
                         ? `<div style="font-size: 0.8rem; margin-top: 5px; background: rgba(0,0,0,0.22); padding: 3px 8px; border-radius: 4px; display: inline-block;">💬 Motif : ${appt.cancelReason}</div>`
                         : '';
@@ -4411,7 +4441,7 @@
                             <div style="font-size: 0.9rem; margin-top: 4px; opacity: 0.95; display: flex; flex-wrap: wrap; align-items: center; gap: 2px;">
                                 <span>Avec ${kineName}</span>${statusBadge}${remainingBadge}
                             </div>
-                            ${cancelReasonHtml}
+                            ${rdvNoteHtml}${cancelReasonHtml}
                         </div>
                         <button onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 8px 14px; font-size: 0.85rem; background-color: white; color: ${kineColor}; border: none; border-radius: 6px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer; flex-shrink: 0;">Aller à</button>
                     </div>`;
