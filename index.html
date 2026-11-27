@@ -459,7 +459,15 @@
                         <label>Statut de la séance</label>
                         <select id="newApptStatus"></select>
                     </div>
+
+                        <!-- Motif d'annulation (lié uniquement à ce RDV) -->
+                    <div class="control-group" id="cancelReasonGroup" style="display: none; background: rgba(229, 62, 62, 0.12); border: 1px solid rgba(229, 62, 62, 0.45); padding: 8px; border-radius: 6px;">
+                        <label for="newApptCancelReason" style="color: #feb2b2;">❌ Motif d'annulation / absence (ce RDV uniquement)</label>
+                        <input type="text" id="newApptCancelReason" placeholder="Ex: Malade, empêchement pro, reporté..." autocomplete="off">
+                    </div>
                 </div>
+
+
 
                 <!-- Ligne 5 : Téléphone et Durée -->
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
@@ -2077,6 +2085,10 @@
             const remainingVal = getVal('newApptRemaining').trim();
             const parsedRemaining = remainingVal !== '' ? parseInt(remainingVal, 10) : null;
             const currentNote = getVal('newApptNotes').trim();
+            const statusVal = getVal('newApptStatus');
+            const cancelReasonVal = (typeof window.isCancellationStatus === 'function' && window.isCancellationStatus(statusVal))
+                ? getVal('newApptCancelReason').trim()
+                : '';
             const recurrenceWeeks = parseInt(getVal('newApptRecurrence', '1')) || 1;
             const selectedDays = Array.from(document.querySelectorAll('.recurrence-day:checked')).map(cb => parseInt(cb.value));
             const patientNameStr = getVal('newPatientName').trim() || 'Patient';
@@ -2086,8 +2098,9 @@
             const baseApptData = {
                 kineId: kineIdVal, dayIndex: parseInt(getVal('newApptDay') || '0'),
                 timeStr: getVal('newApptTime'), duration: parseInt(getVal('newApptDuration', '30')),
-                patient: patientNameStr, note: currentNote, apptType: getVal('newApptType'),
-                status: getVal('newApptStatus'), isImportant: getCheck('newApptImportant'),
+                patient: patientNameStr, note: currentNote, cancelReason: cancelReasonVal,
+                apptType: getVal('newApptType'),
+                status: statusVal, isImportant: getCheck('newApptImportant'),
                 isFirstVisit: getCheck('newApptFirstVisit'),
                 isLastVisit: getCheck('newApptLastVisit') || parsedRemaining === 0,
                 isCV: getCheck('newApptCV'), isDouble: isDoubleVal,
@@ -2169,6 +2182,7 @@
                     if (a.patient && a.patient.toLowerCase() === patientNameStr.toLowerCase()) {
                         a.phones = [...phonesArray];
                         a.note = currentNote;
+                        // cancelReason reste volontairement unique à ce RDV
                     }
                 });
             }
@@ -2243,6 +2257,8 @@
         // --- SAUVEGARDE ET CHARGEMENT ---
         window.pendingPointages = window.pendingPointages || {};
 
+        window.pendingPointages = window.pendingPointages || {};
+
         async function loadDataFromSupabase() {
             try {
                 const { data: configData } = await supabaseClient.from('app_config').select('*');
@@ -2266,6 +2282,7 @@
                         return {
                             id: row.id, kineId: row.kine_id, dayIndex: row.day_index, exactDate: row.exact_date,
                             timeStr: row.time_str, duration: row.duration, patient: row.patient, note: row.note,
+                            cancelReason: row.cancel_reason || '',
                             apptType: row.appt_type, status: row.status, isImportant: row.is_important,
                             isFirstVisit: row.is_first_visit, isLastVisit: row.is_last_visit, isCV: row.is_cv,
                             isDouble: row.is_double || false,
@@ -2291,6 +2308,7 @@
                     const apptsToSave = appointments.map(a => ({
                         id: a.id, kine_id: a.kineId, day_index: a.dayIndex, exact_date: a.exactDate,
                         time_str: a.timeStr, duration: a.duration, patient: a.patient, note: a.note,
+                        cancel_reason: a.cancelReason || '',
                         appt_type: a.apptType, status: a.status, is_important: a.isImportant || false,
                         is_first_visit: a.isFirstVisit || false, is_last_visit: a.isLastVisit || false,
                         is_cv: a.isCV || false, is_double: a.isDouble || false,
@@ -2735,6 +2753,7 @@
                         let tooltipContent = `👤 ${appt.patient}\n`;
                         if (appt.apptType && apptTypesConfig[appt.apptType]) tooltipContent += `🏷️ Type: ${apptTypesConfig[appt.apptType].label}\n`;
                         if (appt.status && statusConfig[appt.status]) tooltipContent += `📌 Statut: ${statusConfig[appt.status].label}\n`;
+                        if (appt.cancelReason && appt.cancelReason.trim().length > 0) tooltipContent += `❌ Motif: ${appt.cancelReason}\n`;
                         if (appt.vegaPointed) tooltipContent += `✅ POINTÉ DANS VEGA\n`;
                         if (appt.isImportant) tooltipContent += '⚠️ IMPORTANT\n';
                         if (appt.isFirstVisit) tooltipContent += '1️⃣ PREMIER BILAN\n';
@@ -2772,6 +2791,10 @@
                             }
                         }
 
+                        const cancelReasonLineHtml = (appt.cancelReason && appt.cancelReason.trim().length > 0)
+                            ? `<div style="font-size: 0.65rem; font-style: italic; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 1px;">❌ ${appt.cancelReason}</div>`
+                            : '';
+
                         el.style.opacity = boxOpacity;
                         if (isPast) el.style.filter = 'grayscale(60%)';
 
@@ -2781,6 +2804,7 @@
                                     <span class="appt-patient-name" style="max-width: 80%;">${prefix}${displayPatientName}</span>
                                     <span style="font-size: 0.65rem; font-weight: 700; opacity: 0.8; margin-top: 1px;">${appt.timeStr}</span>
                                 </div>
+                                ${cancelReasonLineHtml}
                                 ${noteWrapperHtml}
                             </div>
                             <div class="note-tooltip">${tooltipContent.trim()}</div>
@@ -4050,7 +4074,6 @@
 
             syncApptDoubleCheckbox();
 
-            // Rappel visuel si le quota de séances est déjà atteint
             const remInput = document.getElementById('newApptRemaining');
             if (remInput) {
                 const parentBox = remInput.closest('.options-box') || remInput.parentElement;
@@ -4083,7 +4106,6 @@
             }
         });
 
-        // Coche automatiquement "Dernier" si on tape 0 dans Séances restantes
         document.getElementById('newApptRemaining')?.addEventListener('input', function() {
             const lastCb = document.getElementById('newApptLastVisit');
             if (!lastCb) return;
@@ -4095,7 +4117,30 @@
             }
         });
 
-        // Synchronise les cases Doublon et Dernier à l'ouverture de la modale de RDV
+        // --- AFFICHAGE CONDITIONNEL DU MOTIF D'ANNULATION ---
+        window.isCancellationStatus = function(statusVal) {
+            if (!statusVal) return false;
+            if (['no_show', 'cancelled_today', 'cancelled_24h'].includes(statusVal)) return true;
+            if (typeof statusConfig !== 'undefined' && statusConfig[statusVal]) {
+                const label = (statusConfig[statusVal].label || statusConfig[statusVal].name || '').toLowerCase();
+                if (label.includes('annul') || label.includes('absent')) return true;
+            }
+            return false;
+        };
+
+        window.toggleCancelReasonField = function() {
+            const statusSelect = document.getElementById('newApptStatus');
+            const reasonGroup = document.getElementById('cancelReasonGroup');
+            if (!statusSelect || !reasonGroup) return;
+
+            reasonGroup.style.display = window.isCancellationStatus(statusSelect.value) ? 'flex' : 'none';
+        };
+
+        document.getElementById('newApptStatus')?.addEventListener('change', () => {
+            window.toggleCancelReasonField();
+        });
+
+        // Synchronise les cases Doublon, Dernier et le Motif d'annulation à l'ouverture de la modale de RDV
         const apptModalEl = document.getElementById('addApptModal');
         if (apptModalEl) {
             new MutationObserver(() => {
@@ -4103,14 +4148,18 @@
                     const editId = document.getElementById('editApptId')?.value;
                     const doubleCb = document.getElementById('newApptDouble');
                     const lastCb = document.getElementById('newApptLastVisit');
+                    const reasonInput = document.getElementById('newApptCancelReason');
 
                     if (editId) {
                         const appt = appointments.find(a => String(a.id) === String(editId));
                         if (doubleCb) doubleCb.checked = !!(appt && appt.isDouble);
                         if (lastCb) lastCb.checked = !!(appt && (appt.isLastVisit || appt.remainingSessions === 0));
+                        if (reasonInput) reasonInput.value = (appt && appt.cancelReason) ? appt.cancelReason : '';
                     } else {
+                        if (reasonInput) reasonInput.value = '';
                         syncApptDoubleCheckbox();
                     }
+                    window.toggleCancelReasonField();
                 }
             }).observe(apptModalEl, { attributes: true, attributeFilter: ['style'] });
         }
@@ -4249,7 +4298,7 @@
             };
         }
 
-        // --- DOSSIER PATIENT (ONGLETS À VENIR / HISTORIQUE + SÉANCES RESTANTES) ---
+        // --- DOSSIER PATIENT (ONGLETS À VENIR / HISTORIQUE + SÉANCES + MOTIF) ---
         window.switchPatientHistoryTab = function(tabName) {
             const tabUpcoming = document.getElementById('tabBtnUpcoming');
             const tabPast = document.getElementById('tabBtnPast');
@@ -4351,6 +4400,10 @@
                         remainingBadge = `<span style="background: rgba(246, 173, 85, 0.35); border: 1px solid rgba(255,255,255,0.65); padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 6px;">🏁 Dernière</span>`;
                     }
 
+                    const cancelReasonHtml = (appt.cancelReason && appt.cancelReason.trim().length > 0)
+                        ? `<div style="font-size: 0.8rem; margin-top: 5px; background: rgba(0,0,0,0.22); padding: 3px 8px; border-radius: 4px; display: inline-block;">💬 Motif : ${appt.cancelReason}</div>`
+                        : '';
+
                     return `
                     <div style="background-color: ${kineColor}; opacity: ${isPastList ? '0.88' : '1'}; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; box-shadow: 0 3px 5px rgba(0,0,0,0.1);">
                         <div style="color: white; min-width: 0;">
@@ -4358,6 +4411,7 @@
                             <div style="font-size: 0.9rem; margin-top: 4px; opacity: 0.95; display: flex; flex-wrap: wrap; align-items: center; gap: 2px;">
                                 <span>Avec ${kineName}</span>${statusBadge}${remainingBadge}
                             </div>
+                            ${cancelReasonHtml}
                         </div>
                         <button onclick="window.goToDate('${appt.exactDate}', ${appt.id})" style="padding: 8px 14px; font-size: 0.85rem; background-color: white; color: ${kineColor}; border: none; border-radius: 6px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer; flex-shrink: 0;">Aller à</button>
                     </div>`;
@@ -4570,6 +4624,41 @@
             }
         };
 
+        // --- SAUVEGARDE UNITAIRE DU POINTAGE (FIABILITÉ MOBILE) ---
+        window.toggleSinglePointage = async function(apptId, isPointed) {
+            const appt = appointments.find(a => String(a.id) === String(apptId));
+            if (!appt) return;
+
+            window.pendingPointages = window.pendingPointages || {};
+            appt.vegaPointed = isPointed;
+            window.pendingPointages[appt.id] = {
+                value: isPointed,
+                expiresAt: Date.now() + 5000
+            };
+
+            try {
+                let { data: { session } } = await supabaseClient.auth.getSession();
+                if (!session) {
+                    const refreshed = await supabaseClient.auth.refreshSession();
+                    session = refreshed.data?.session;
+                }
+                if (!session) throw new Error("Session expirée");
+
+                const { error } = await supabaseClient
+                    .from('appointments')
+                    .update({ vega_pointed: isPointed })
+                    .eq('id', appt.id);
+
+                if (error) throw error;
+            } catch (err) {
+                console.error("Échec du pointage :", err);
+                delete window.pendingPointages[appt.id];
+                appt.vegaPointed = !isPointed;
+                if (typeof renderCalendar === 'function') renderCalendar();
+                alert("⚠️ Connexion instable : le pointage n'a pas pu être enregistré. Vérifie ton réseau et recoche la séance.");
+            }
+        };
+
         // --- AFFICHAGE DEMI-LARGEUR (50 %) POUR LES CRÉNEAUX DOUBLONS DISPONIBLES ---
         if (typeof window.createKineColumn === 'function' && !window._doubleBubblePatched) {
             window._doubleBubblePatched = true;
@@ -4640,43 +4729,6 @@
         setTimeout(() => {
             if (typeof loadPatientsFromSupabase === 'function') loadPatientsFromSupabase();
         }, 1200);
-
-        window.toggleSinglePointage = async function(apptId, isPointed) {
-            const appt = appointments.find(a => String(a.id) === String(apptId));
-            if (!appt) return;
-
-            // 1. Mise à jour immédiate + verrou anti-écrasement de 5 secondes
-            appt.vegaPointed = isPointed;
-            window.pendingPointages[appt.id] = {
-                value: isPointed,
-                expiresAt: Date.now() + 5000
-            };
-
-            try {
-                // 2. Vérifie que la session mobile est bien active avant d'écrire
-                let { data: { session } } = await supabaseClient.auth.getSession();
-                if (!session) {
-                    const refreshed = await supabaseClient.auth.refreshSession();
-                    session = refreshed.data?.session;
-                }
-                if (!session) throw new Error("Session expirée");
-
-                // 3. Met à jour UNIQUEMENT ce rendez-vous (requête ultra-légère sur mobile)
-                const { error } = await supabaseClient
-                    .from('appointments')
-                    .update({ vega_pointed: isPointed })
-                    .eq('id', appt.id);
-
-                if (error) throw error;
-            } catch (err) {
-                // 4. Si le réseau mobile a coupé, on décoche visuellement et on prévient immédiatement
-                console.error("Échec du pointage :", err);
-                delete window.pendingPointages[appt.id];
-                appt.vegaPointed = !isPointed;
-                if (typeof renderCalendar === 'function') renderCalendar();
-                alert("⚠️ Connexion instable : le pointage n'a pas pu être enregistré. Vérifie ton réseau et recoche la séance.");
-            }
-        };
     </script>
 </body>
 </html>
