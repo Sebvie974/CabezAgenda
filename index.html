@@ -321,11 +321,22 @@
             }
         }
 
-        .empty-slot-time {
-            position: absolute; right: 2px;
-            font-size: 0.65rem; color: #a0aec0; font-weight: 600;
-            pointer-events: none; padding-top: 2px; text-align: right; width: 100%;
-        }
+        .appointment {
+    z-index: 5;
+}
+
+.empty-slot-time {
+    pointer-events: auto !important;
+    z-index: 1;
+    transition: font-size 0.12s ease, color 0.12s ease, background-color 0.12s ease;
+}
+
+.empty-slot-time:hover {
+    font-size: 0.9rem !important;
+    font-weight: 800 !important;
+    color: #2b6cb0 !important;
+    background-color: rgba(49, 130, 206, 0.08);
+}
     </style>
     <style>
         /* CORRECTION AFFICHAGE MOBILE BARRE D'OUTILS */
@@ -2853,7 +2864,19 @@
                 });
             });
 
+            // Conversion des horaires du jour en minutes pour filtrer les zones fermées
+            const openStartMins = Math.round((daySchedule.start ?? START_HOUR) * 60);
+            const openEndMins = Math.round((daySchedule.end ?? END_HOUR) * 60);
+            const pauseStartMins = Math.round((daySchedule.pauseStart ?? 0) * 60);
+            const pauseEndMins = Math.round((daySchedule.pauseEnd ?? 0) * 60);
+
             for (let m = START_HOUR * 60; m < END_HOUR * 60; m += config.slotDuration) {
+                const isBeforeStart = m < openStartMins;
+                const isAfterEnd = m >= openEndMins;
+                const isInPause = (pauseStartMins < pauseEndMins) && (m >= pauseStartMins && m < pauseEndMins);
+
+                if (isBeforeStart || isAfterEnd || isInPause) continue;
+
                 const isOccupied = dailyAppts.some(a => {
                     if (!a.timeStr) return false;
                     const [h, min] = a.timeStr.split(':').map(Number);
