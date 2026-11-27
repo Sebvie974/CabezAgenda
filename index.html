@@ -2781,19 +2781,23 @@
                         el.style.borderLeftColor = apptColor;
                         el.style.color = apptColor;
 
-                        let tooltipContent = `👤 ${appt.patient}\n`;
-                        if (appt.apptType && apptTypesConfig[appt.apptType]) tooltipContent += `🏷️ Type: ${apptTypesConfig[appt.apptType].label}\n`;
-                        if (appt.status && statusConfig[appt.status]) tooltipContent += `📌 Statut: ${statusConfig[appt.status].label}\n`;
-                        if (appt.cancelReason && appt.cancelReason.trim().length > 0) tooltipContent += `❌ Motif: ${appt.cancelReason}\n`;
-                        if (appt.vegaPointed) tooltipContent += `✅ POINTÉ DANS VEGA\n`;
-                        if (appt.isImportant) tooltipContent += '⚠️ IMPORTANT\n';
-                        if (appt.isFirstVisit) tooltipContent += '1️⃣ PREMIER BILAN\n';
-                        if (appt.isLastVisit) tooltipContent += '🛑 DERNIER RDV / ARRÊT\n';
-                        if (appt.isCV) tooltipContent += '🟩 CARTE VITALE À DEMANDER\n';
-                        if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) tooltipContent += `⏳ ${appt.remainingSessions} séance(s) restante(s)\n`;
-                        if (appt.phones && appt.phones.length > 0) tooltipContent += `📞 ${appt.phones.join(' / ')}\n`;
-                        if (appt.rdvNote && appt.rdvNote.trim().length > 0) tooltipContent += `📌 Note RDV: ${appt.rdvNote}\n`;
-                        if (appt.note && appt.note.length > 0) tooltipContent += `📝 ${appt.note}`;
+                        let tooltipDetails = '';
+                        if (appt.apptType && apptTypesConfig[appt.apptType]) tooltipDetails += `🏷️ Type: ${apptTypesConfig[appt.apptType].label}\n`;
+                        if (appt.status && statusConfig[appt.status]) tooltipDetails += `📌 Statut: ${statusConfig[appt.status].label}\n`;
+                        if (appt.cancelReason && appt.cancelReason.trim().length > 0) tooltipDetails += `❌ Motif: ${appt.cancelReason}\n`;
+                        if (appt.vegaPointed) tooltipDetails += `✅ POINTÉ DANS VEGA\n`;
+                        if (appt.isImportant) tooltipDetails += '⚠️ IMPORTANT\n';
+                        if (appt.isFirstVisit) tooltipDetails += '1️⃣ PREMIER BILAN\n';
+                        if (appt.isLastVisit) tooltipDetails += '🛑 DERNIER RDV / ARRÊT\n';
+                        if (appt.isCV) tooltipDetails += '🟩 CARTE VITALE À DEMANDER\n';
+                        if (appt.remainingSessions !== null && appt.remainingSessions !== undefined) tooltipDetails += `⏳ ${appt.remainingSessions} séance(s) restante(s)\n`;
+                        if (appt.phones && appt.phones.length > 0) tooltipDetails += `📞 ${appt.phones.join(' / ')}\n`;
+                        if (appt.rdvNote && appt.rdvNote.trim().length > 0) tooltipDetails += `📌 Note RDV: ${appt.rdvNote}\n`;
+                        if (appt.note && appt.note.length > 0) tooltipDetails += `📝 ${appt.note}`;
+
+                        const trimmedDetails = tooltipDetails.trim();
+                        const tooltipHeaderHtml = `<div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; width: 100%;${trimmedDetails ? ' margin-bottom: 3px;' : ''}"><span>👤 ${appt.patient}</span><span style="font-weight: 700; opacity: 0.9; flex-shrink: 0;">🕒 ${appt.timeStr}</span></div>`;
+                        const tooltipHtml = `${tooltipHeaderHtml}${trimmedDetails}`;
                         
                         let iconHtml = '';
                         if (appt.isImportant) iconHtml += '<span class="note-icon">⚠️</span>';
@@ -2840,7 +2844,7 @@
                                 ${cancelReasonLineHtml}
                                 ${noteWrapperHtml}
                             </div>
-                            <div class="note-tooltip">${tooltipContent.trim()}</div>
+                            <div class="note-tooltip">${tooltipHtml}</div>
                         `;
 
                         // Empêche la bulle d'infos de dépasser le bord droit de l'écran (ex: colonne du vendredi)
